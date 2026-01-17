@@ -2,10 +2,11 @@
 MODULE 5: Lowballer Agent (Dev 3)
 Purpose: Negotiates in seller chat windows with strategic lowball offers
 
-Strategy:
-- Round 1: Offer 50% of listing price
-- Each round: Increase by 10% up to max 70%
-- Walk away if seller won't budge after max rounds
+Strategy (Ackerman Model from "Never Split the Difference"):
+- Round 1: Offer 65% of listing price (with precise number)
+- Round 2: Offer 85%
+- Round 3: Offer 95%
+- Round 4: Offer 100% (your true max) + walk-away bluff
 
 Provides:
 - LowballerAgent.negotiate(seller_id, listing_price, page)
@@ -15,7 +16,9 @@ Provides:
 
 import asyncio
 import json
+import random
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import Optional, Any
 
@@ -23,29 +26,118 @@ from llm_factory import LLMClient, LLMFactory
 from config import config
 
 
+# ============================================
+# NEGOTIATION PERSONAS
+# ============================================
+
+class NegotiationPersona(Enum):
+    """Different negotiation styles the agent can use."""
+    FRIENDLY = "friendly"
+    STUDENT = "student"
+    BULK_BUYER = "bulk_buyer"
+    URGENT_CASH = "urgent_cash"
+    CHRIS_VOSS = "chris_voss"
+
+
+# ============================================
+# SYSTEM PROMPTS BY PERSONA
+# ============================================
+
+SYSTEM_PROMPTS = {
+    "chris_voss": """You are a savvy Carousell buyer in Singapore using FBI negotiation tactics from "Never Split the Difference".
+
+CORE PRINCIPLES:
+1. Tactical empathy - acknowledge their position before countering
+2. Use PRECISE numbers ($387 not $400) - signals you've done research
+3. Label emotions: "It seems like...", "It sounds like..."
+4. Calibrated questions: "How can we make this work?"
+5. Late-night DJ voice - warm, calm, never aggressive
+
+STYLE:
+- Keep messages SHORT (1-2 sentences max)
+- Sound human, use occasional Singlish (lah, can?, steady)
+- Mention cash + quick pickup as leverage
+- Never be rude or pushy""",
+
+    "student": """You are a university student in Singapore looking for deals on Carousell.
+Be genuine about budget constraints. Be polite and appreciative.
+Use casual language like you're texting a friend.
+Keep messages short (1-2 sentences). Mention you're a student.""",
+
+    "bulk_buyer": """You are a buyer looking at multiple items from the same seller.
+Mention you're interested in other items from them too.
+Be business-like but friendly. Propose bundle deals.
+Keep it professional and concise.""",
+
+    "urgent_cash": """You have cash ready and can meet IMMEDIATELY.
+Create urgency - you're free RIGHT NOW to collect.
+Be direct and efficient. Emphasize speed and convenience.
+Short messages only.""",
+
+    "friendly": """You are a friendly buyer just looking for a good deal on Carousell.
+Be warm, casual, and complimentary about the item.
+No pressure tactics, just genuine interest.
+Chat like you're talking to a neighbor."""
+}
+
+
+# ============================================
+# ROUND CONTEXTS (Chris Voss Tactics)
+# ============================================
+
+ROUND_CONTEXTS = {
+    1: """ANCHOR LOW with tactical empathy. Start with: 'I know this is below asking, but...'
+Use your PRECISE offer number. Justify briefly: 'Seen similar listings around this price.'
+Be friendly and non-threatening.""",
+
+    2: """MIRROR their response if they objected. If they said 'firm', you can reply 'Firm?'
+Increase your offer. Add value: 'I can do cash and pickup within the hour.'
+Show you're reasonable but have limits.""",
+
+    3: """LABEL their situation: 'It seems like you want this sold quickly...'
+Show flexibility but stay firm on your number.
+Create urgency: 'I'm free right now if we can agree.'""",
+
+    4: """Use ACCUSATION AUDIT: 'You probably have better offers coming in...'
+This is near your max. Express genuine interest but also your limits.
+Hint this might be your final offer.""",
+
+    5: """WALK-AWAY BLUFF: 'I totally understand if this doesn't work for you. Good luck with the sale!'
+State your final precise number clearly.
+This psychological tactic often triggers acceptance."""
+}
+
+
 class LowballerAgent:
     """
     Specialized negotiation agent that handles lowball offers and counter-negotiations.
+    Uses the Ackerman Model and Chris Voss tactics from "Never Split the Difference".
     Maintains chat history and uses strategic price escalation.
     """
-    
-    def __init__(self, llm: LLMClient):
+
+    def __init__(self, llm: LLMClient, persona: NegotiationPersona = NegotiationPersona.CHRIS_VOSS):
         """
         Initialize the lowballer agent.
-        
+
         Args:
             llm: LLM client for generating negotiation messages
+            persona: Negotiation style to use (default: CHRIS_VOSS)
         """
         self.llm = llm
+        self.persona = persona
         self.chat_history_file = Path("chat_history.json")
         self.chat_history: dict[str, list] = self._load_chat_history()
-        
-        # Negotiation settings from config
-        self.initial_percent = config.agent.initial_lowball_percent
-        self.max_percent = config.agent.max_offer_percent
+
+        # Ackerman Model percentages (from "Never Split the Difference")
+        self.ackerman_percentages = {
+            1: 65,   # Anchor low
+            2: 85,   # Show flexibility
+            3: 95,   # Getting close
+            4: 100,  # Your true max
+        }
         self.max_rounds = config.agent.max_negotiation_rounds
-        
-        print(f"LOWBALLER: Initialized (offers: {self.initial_percent}%-{self.max_percent}%)")
+
+        print(f"LOWBALLER: Initialized with {persona.value} persona (Ackerman: 65%→85%→95%→100%)")
     
     def _load_chat_history(self) -> dict:
         """Load chat history from file."""
@@ -72,22 +164,36 @@ class LowballerAgent:
     
     def _calculate_offer(self, listing_price: float, round_num: int) -> float:
         """
-        Calculate the offer price for a given round.
-        
+        Calculate the offer price using the Ackerman Model.
+
+        The Ackerman Model (from "Never Split the Difference"):
+        - Round 1: 65% (anchor low)
+        - Round 2: 85% (show flexibility)
+        - Round 3: 95% (getting close)
+        - Round 4+: 100% (your true max)
+
+        Also uses PRECISE numbers (e.g., $387 instead of $400) for
+        psychological anchoring - signals you've done research.
+
         Args:
             listing_price: Original listing price
             round_num: Current negotiation round (1-indexed)
-            
+
         Returns:
-            Calculated offer price
+            Calculated offer price (precise, non-round number)
         """
-        if round_num == 1:
-            percent = self.initial_percent
-        else:
-            # Increase by 10% each round up to max
-            percent = min(self.initial_percent + (round_num - 1) * 10, self.max_percent)
-        
-        return int(listing_price * (percent / 100))
+        # Get Ackerman percentage for this round
+        percent = self.ackerman_percentages.get(round_num, 100)
+
+        # Calculate base offer
+        base_offer = listing_price * (percent / 100)
+
+        # Make it a PRECISE number (psychological anchoring)
+        # Add small random offset to avoid round numbers like $400, $500
+        offset = random.choice([-3, -7, +2, +8, -2, +3])
+        precise_offer = int(base_offer) + offset
+
+        return max(precise_offer, 1)  # Never go below $1
     
     async def negotiate(
         self,
@@ -172,80 +278,96 @@ class LowballerAgent:
         offer_price: float,
         round_num: int,
     ) -> str:
-        """Generate a negotiation message using the LLM."""
-        
-        # Build context-aware prompt
-        round_context = {
-            1: "This is your first message. Be friendly and make a low but reasonable offer.",
-            2: "The seller didn't accept your first offer. Increase slightly but stay firm.",
-            3: "Third attempt. Show some flexibility but don't go too high.",
-            4: "Getting closer to your max. Express urgency.",
-            5: "Final offer. Make it clear this is your best and final price.",
-        }
-        
-        context = round_context.get(round_num, "Make a reasonable counteroffer.")
-        
+        """
+        Generate a negotiation message using the LLM.
+
+        Uses persona-specific system prompts and Chris Voss tactics
+        from "Never Split the Difference" for each round.
+        """
+        # Get persona-specific system prompt
+        system_prompt = SYSTEM_PROMPTS.get(self.persona.value, SYSTEM_PROMPTS["chris_voss"])
+
+        # Get round-specific tactical context
+        context = ROUND_CONTEXTS.get(round_num, "Make a reasonable counteroffer. Be friendly but firm.")
+
         messages = [
             {
                 "role": "system",
-                "content": """You are negotiating on Carousell Singapore. Write natural, casual messages like a real buyer.
-Rules:
-- Keep messages short (1-2 sentences max)
-- Be friendly but firm on price
-- Mention cash payment and quick pickup as incentives
-- Don't be rude or aggressive
-- Sound like a real person, not a bot"""
+                "content": system_prompt
             },
             {
                 "role": "user",
-                "content": f"""Generate a negotiation message:
+                "content": f"""Generate a negotiation message for Carousell:
+
 Item: {item_name}
 Listed Price: S${listing_price}
 Your Offer: S${offer_price}
 Round: {round_num}
-Context: {context}
 
-Write just the message, nothing else."""
+TACTICAL GUIDANCE:
+{context}
+
+Write ONLY the message itself, nothing else. Keep it to 1-2 sentences max."""
             }
         ]
-        
+
         try:
             response = await self.llm.complete(messages, max_tokens=100)
             message = response.get("content", "").strip()
-            
-            # Clean up the message
+
+            # Check for LLM error or empty response
+            if not message or response.get("error"):
+                raise ValueError("LLM error or empty response")
+
+            # Clean up the message (remove quotes if LLM wrapped it)
             message = message.strip('"\'')
-            if not message:
-                raise ValueError("Empty response")
-            
+
             return message
-            
+
         except Exception as e:
             print(f"LOWBALLER: ✗ LLM generation failed, using fallback → {e}")
             return self._get_fallback_message(item_name, offer_price, round_num)
     
     def _get_fallback_message(self, item_name: str, offer_price: float, round_num: int) -> str:
-        """Get a fallback message without LLM."""
+        """
+        Get a fallback message without LLM.
+
+        Uses Chris Voss tactics even in fallback mode:
+        - Round 1: Tactical empathy + anchor
+        - Round 2: Mirror + add value
+        - Round 3: Label + urgency
+        - Round 4: Accusation audit
+        - Round 5: Walk-away bluff
+        """
         fallbacks = {
-            1: [
-                f"Hi! Interested in your {item_name}. Would you take ${offer_price} cash? Can pickup today.",
-                f"Hey! Love the {item_name}. Can do ${offer_price} with immediate pickup?",
-                f"Hi there! Can you do ${offer_price} for quick deal?",
+            1: [  # Tactical empathy + anchor
+                f"Hi! I know this is below asking, but seen similar {item_name}s around ${offer_price}. Cash ready, can pickup today!",
+                f"Hey! Love the {item_name}. I know ${offer_price} is low but that's my budget - can do cash and immediate pickup?",
+                f"Hi there! ${offer_price} might be cheeky but I'm serious buyer with cash. How can we make this work?",
             ],
-            2: [
-                f"I understand. Would ${offer_price} work? Cash ready.",
-                f"How about ${offer_price}? Can collect anytime this week.",
-                f"Best I can do is ${offer_price} - interested?",
+            2: [  # Mirror + add value
+                f"Firm? I understand. Would ${offer_price} work if I pickup within the hour? Cash in hand.",
+                f"I hear you. Can stretch to ${offer_price} - I'll come to you anytime today, cash ready.",
+                f"Got it. How about ${offer_price} with immediate collection? Trying to make it easy for you.",
             ],
-            3: [
-                f"Last offer - ${offer_price} cash today?",
-                f"Can stretch to ${offer_price}, that's really my max.",
-                f"${offer_price} is my highest. Let me know!",
+            3: [  # Label + urgency
+                f"It seems like you want this sold quickly - ${offer_price} cash and I'm free right now to collect?",
+                f"Sounds like you've had lowballers before, but ${offer_price} is genuine. Can meet in 30 mins!",
+                f"${offer_price} is really my max lah. Can do cash and pickup today if that helps?",
+            ],
+            4: [  # Accusation audit
+                f"You probably have better offers coming in, but ${offer_price} cash today is my best. Serious buyer here.",
+                f"I know ${offer_price} might not be what you hoped for, but I'm ready to deal now. What do you think?",
+                f"You're probably thinking this is too low - ${offer_price} is genuinely my limit though. Cash ready!",
+            ],
+            5: [  # Walk-away bluff
+                f"I totally understand if ${offer_price} doesn't work for you. Good luck with the sale!",
+                f"${offer_price} is really my final offer. No worries if it doesn't work - all the best!",
+                f"Can only do ${offer_price} max. If not, no hard feelings - hope you find a buyer soon!",
             ],
         }
-        
-        import random
-        options = fallbacks.get(round_num, fallbacks[3])
+
+        options = fallbacks.get(round_num, fallbacks[5])
         return random.choice(options)
     
     async def _send_message(self, page: Any, message: str) -> bool:
@@ -363,8 +485,9 @@ Write just the message, nothing else."""
             })
         
         # Decide if we should accept or counter
+        # In Ackerman model, 100% is our true max (round 4 percentage)
         listing_price = listing_data.get("price", 0)
-        max_acceptable = listing_price * (self.max_percent / 100)
+        max_acceptable = listing_price * (self.ackerman_percentages.get(4, 100) / 100)
         
         if seller_price <= max_acceptable:
             # Accept the offer!
