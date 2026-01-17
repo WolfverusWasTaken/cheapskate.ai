@@ -41,6 +41,7 @@ Commands:
   open <index>          - Open a specific listing
   chat <index>          - Open chat with seller
   lowball <index>       - Start negotiation on a listing
+  check_chat            - Go to inbox and stay updated
   screenshot            - Take a screenshot
   history               - Show negotiation history
   help                  - Show this help
@@ -150,6 +151,9 @@ async def main():
                 
                 if lower_prompt == 'screenshot':
                     prompt = "take a screenshot of the current page"
+                
+                if lower_prompt == 'check_chat' or lower_prompt == 'inbox':
+                    prompt = "go to the inbox and stay updated"
                 
                 # Process through controller
                 print(f"\n🤖 Processing...")

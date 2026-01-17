@@ -138,6 +138,18 @@ class ControllerAgent:
             {
                 "type": "function",
                 "function": {
+                    "name": "check_chat",
+                    "description": "Go to the Carousell inbox and stay idle to check for new messages or replies from sellers.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "take_screenshot",
                     "description": "Take a screenshot of the current browser page.",
                     "parameters": {
@@ -162,6 +174,7 @@ class ControllerAgent:
             "open_listing": self._handle_open_listing,
             "open_chat": self._handle_open_chat,
             "delegate_lowball": self._handle_delegate_lowball,
+            "check_chat": self._handle_check_chat,
             "take_screenshot": self._handle_screenshot,
         }
     
@@ -214,10 +227,12 @@ You have access to these tools:
 - open_listing(listing_index): View a specific listing
 - open_chat(listing_index): Open chat with seller
 - delegate_lowball(listing_index): Start negotiation
+- check_chat(): Go to inbox and stay updated
 - take_screenshot(): Capture current page
 
 When the user asks to find items, use search_carousell first, then extract_listings to show results.
 When they want to negotiate, use delegate_lowball to start the lowball negotiation.
+When they want to check messages or see what sellers said, use check_chat.
 
 Be helpful, proactive, and explain what you're doing."""
         }
@@ -822,7 +837,40 @@ Be helpful, proactive, and explain what you're doing."""
             page=page,
         )
         
+        # Step 5: Post-negotiation idle (User request: go home and refresh)
+        if "Sent offer" in result:
+            print("CONTROLLER: Lowball message sent! Going home to stay idle as requested...")
+            # Run a limited idle refresh (e.g., 5-10 refreshes)
+            # This is non-blocking in the sense that it completes before returning the result
+            await self.browser.idle_refresh(interval=7, max_refreshes=5)
+        
         return result
+
+    async def _handle_check_chat(self) -> str:
+        """Handle check_chat tool by monitoring for new messages and replying."""
+        print("CONTROLLER: 👀 Starting smart message check...")
+        
+        # Use the new check_for_new_messages method
+        has_new_message = await self.browser.check_for_new_messages(interval=7, max_checks=15)
+        
+        if not has_new_message:
+            return "No new messages detected after checking. The agent is now idle."
+        
+        # New message detected! Navigate to inbox
+        print("CONTROLLER: 💬 New message detected! Navigating to inbox...")
+        inbox_url = "https://www.carousell.sg/inbox/"
+        success = await self.browser.navigate(inbox_url)
+        
+        if not success:
+            return "New message detected but failed to navigate to inbox."
+        
+        await asyncio.sleep(2) # Allow inbox to load
+        
+        # TODO: Future enhancement - scrape the latest conversation and generate a reply
+        # For now, just notify the user
+        print("CONTROLLER: ✅ Inbox opened. You can see the new message in the browser.")
+        
+        return "💬 New message detected! I've opened the inbox for you to review."
     
     async def _handle_screenshot(self, filename: Optional[str] = None) -> str:
         """Handle take_screenshot tool."""
