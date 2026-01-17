@@ -121,19 +121,27 @@ class BrowserLoader:
             target_url = url
             await self._page.goto(url, wait_until=wait_until, timeout=30000)
             
-            # Handle popups and potential redirects
+            # Initial popup check (popups may appear immediately)
+            await asyncio.sleep(0.3)
             await self.handle_carousell_popups()
             
             # If redirected away from search (e.g. to a landing page), go back
             if "carousell.sg/search" in target_url and "carousell.sg/search" not in self._page.url:
                 print(f"BROWSER: 🔄 Detected redirect away from search! Going back...")
                 await self._page.go_back()
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)
                 await self.handle_carousell_popups()
             
             print(f"BROWSER: ✓ Navigation complete → {self._page.url}")
             
+            # CRITICAL: Dismiss popups BEFORE any other interactions
+            # Popups appear after page load and block all interactions
+            await asyncio.sleep(0.5)  # Wait for popup to appear
+            await self.handle_carousell_popups()
+            await asyncio.sleep(0.2)  # Brief wait after dismissal
+            
             # Special handling for Carousell search pages: switch to "All" tab if on "Certified"
+            # Only do this AFTER popup is dismissed
             if "carousell.sg/search" in self._page.url:
                 await self.handle_carousell_tabs()
             
@@ -146,48 +154,88 @@ class BrowserLoader:
             return False
 
     async def handle_carousell_popups(self):
-        """Detect and close annoying Carousell popups/overlays."""
-        print("BROWSER: 🧹 Checking for intrusive popups...")
+        """Aggressive popup dismissal: Wait for popup, find X, click immediately."""
         try:
-            # Common Carousell popup elements
-            popup_selectors = [
-                'button:has-text("Next")',
-                'button:has-text("Got it")',
-                'button:has-text("Close")',
+            # Wait a moment for popup to appear
+            await asyncio.sleep(0.3)
+            
+            # Check for popup
+            has_overlay = await self._page.evaluate("""
+                () => {
+                    const dialogs = document.querySelectorAll('[role="dialog"]');
+                    for (let d of dialogs) {
+                        const style = window.getComputedStyle(d);
+                        if (style.display !== 'none' && style.visibility !== 'hidden') return true;
+                    }
+                    return false;
+                }
+            """)
+            
+            if not has_overlay:
+                return
+            
+            print("BROWSER: 🧹 Popup detected, attempting to close...")
+            
+            # Try JavaScript click first (most reliable)
+            clicked = await self._page.evaluate("""
+                () => {
+                    const buttons = document.querySelectorAll('button, [role="button"]');
+                    for (let btn of buttons) {
+                        const style = window.getComputedStyle(btn);
+                        if (style.display === 'none') continue;
+                        
+                        const text = (btn.innerText || '').trim();
+                        const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
+                        
+                        if ((text === '×' || text === '✕' || text === '✖' || 
+                             ariaLabel === 'close' || ariaLabel.includes('close')) &&
+                            !text.toLowerCase().includes('continue') &&
+                            !text.toLowerCase().includes('next')) {
+                            btn.click();
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            """)
+            
+            if clicked:
+                print("BROWSER: ✓ Closed popup via JavaScript")
+                await asyncio.sleep(0.2)
+                return
+            
+            # Fallback: Try selectors
+            x_selectors = [
+                'button:has-text("×")',
+                'button:has-text("✕")',
+                'button[aria-label="Close"]',
                 'svg[aria-label="Close"]',
-                '[data-testid="onboarding-close"]',
-                '.D_azf', # Possible close button class from DOM history
-                'div[role="dialog"] button'
             ]
             
-            # Try to clear up to 3 layers of popups (onboarding often has multiple steps)
-            for i in range(3):
-                found_popup = False
-                for selector in popup_selectors:
-                    try:
-                        # Use a very short timeout for popup checks
-                        btn = await self._page.query_selector(selector)
-                        if btn and await btn.is_visible():
-                            # Confirm it's not a button we actually want (like 'Search')
-                            text = await btn.inner_text()
-                            if text.lower() in ["next", "got it", "close", ""] or not text:
-                                print(f"BROWSER: 🖱️ Clicking popup button: '{text}' ({selector})")
-                                await btn.click()
-                                await asyncio.sleep(1)
-                                found_popup = True
-                                break 
-                    except:
-                        continue
-                if not found_popup:
-                    break
+            for selector in x_selectors:
+                try:
+                    btn = await self._page.query_selector(selector)
+                    if btn and await btn.is_visible(timeout=500):
+                        await btn.click(timeout=1000)
+                        print(f"BROWSER: ✓ Closed popup via selector: {selector}")
+                        return
+                except:
+                    continue
+                    
         except Exception as e:
-            print(f"BROWSER: Debug - Popup handling skipped: {e}")
+            print(f"BROWSER: ⚠️ Popup handling error: {e}")
 
     async def handle_carousell_tabs(self):
         """Detect and click the 'All' tab on search pages to bypass 'Certified' filter."""
         try:
+            # CRITICAL: Dismiss popups first - they block tab interactions
+            await self.handle_carousell_popups()
+            
             # Short wait for any dynamic tab loaders
             await asyncio.sleep(1.5)
+            
+            # Check popup again before interacting (popups can appear late)
+            await self.handle_carousell_popups()
             
             # Look for "All" tab. Carousell often defaults to "Certified" for high-intent searches.
             # We want to see EVERYTHING.

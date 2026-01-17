@@ -40,6 +40,7 @@ class ControllerAgent:
         self.current_listings: list[dict] = []
         self.conversation_history: list[dict] = []
         self.lowballer = None  # Lazy-loaded
+        self._popup_check_task: Optional[asyncio.Task] = None  # Background popup checker
         
         # Define available tools
         self.tools = self._define_tools()
@@ -253,6 +254,356 @@ Be helpful, proactive, and explain what you're doing."""
         
         return combined_result
     
+    # Popup Management
+    
+    async def dismiss_popups(self, grace_period: float = 0.3, max_attempts: int = 5) -> bool:
+        """
+        Aggressive popup dismissal: Wait for popup, find X button, click immediately.
+        
+        Args:
+            grace_period: Wait time for popup to appear (default 0.3s)
+            max_attempts: Maximum attempts to dismiss (default 5)
+            
+        Returns:
+            True if popup was dismissed, False otherwise
+        """
+        page = self.browser.get_page()
+        if not page:
+            return False
+        
+        print("CONTROLLER: 🧹 Checking for popups...")
+        
+        # Wait for popup to appear
+        if grace_period > 0:
+            await asyncio.sleep(grace_period)
+        
+        for attempt in range(max_attempts):
+            try:
+                # Check if popup exists using JavaScript (more reliable)
+                popup_info = await page.evaluate("""
+                    () => {
+                        // Find dialogs
+                        const dialogs = document.querySelectorAll('[role="dialog"]');
+                        for (let d of dialogs) {
+                            const style = window.getComputedStyle(d);
+                            if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+                                return { found: true, type: 'dialog' };
+                            }
+                        }
+                        
+                        // Find high z-index overlays
+                        const all = document.querySelectorAll('*');
+                        for (let el of all) {
+                            const style = window.getComputedStyle(el);
+                            const zIndex = parseInt(style.zIndex) || 0;
+                            if (zIndex >= 1000 && style.display !== 'none' && style.visibility !== 'hidden') {
+                                const rect = el.getBoundingClientRect();
+                                if (rect.width > window.innerWidth * 0.5 && rect.height > window.innerHeight * 0.5) {
+                                    return { found: true, type: 'overlay', zIndex: zIndex };
+                                }
+                            }
+                        }
+                        
+                        return { found: false };
+                    }
+                """)
+                
+                if not popup_info.get('found'):
+                    if attempt == 0:
+                        print("CONTROLLER: ✓ No popup detected")
+                    return False  # No popup found
+                
+                print(f"CONTROLLER: 🔍 Popup detected (attempt {attempt + 1}/{max_attempts})")
+                
+                # Try multiple strategies to find and click X button
+                x_selectors = [
+                    'button:has-text("×")',
+                    'button:has-text("✕")',
+                    'button:has-text("✖")',
+                    'button[aria-label="Close"]',
+                    'button[aria-label="close"]',
+                    'button[aria-label*="Close" i]',
+                    'svg[aria-label="Close"]',
+                    'svg[aria-label="close"]',
+                    '[data-testid*="close" i]',
+                    '[class*="close"][class*="button"]',
+                    '[class*="CloseButton"]',
+                ]
+                
+                # Strategy 1: Try Playwright locators
+                for selector in x_selectors:
+                    try:
+                        locator = page.locator(selector).first
+                        if await locator.is_visible(timeout=500):
+                            await locator.click(timeout=1000)
+                            print(f"CONTROLLER: ✓ Clicked X button via selector: {selector}")
+                            await asyncio.sleep(0.2)  # Brief wait for popup to close
+                            return True
+                    except Exception as e:
+                        continue
+                
+                # Strategy 2: JavaScript-based click (more reliable for dynamic content)
+                clicked = await page.evaluate("""
+                    () => {
+                        // Find all buttons and check for X/close
+                        const buttons = document.querySelectorAll('button, [role="button"], a, div[onclick], span[onclick]');
+                        for (let btn of buttons) {
+                            const style = window.getComputedStyle(btn);
+                            if (style.display === 'none' || style.visibility === 'hidden') continue;
+                            
+                            const text = (btn.innerText || btn.textContent || '').trim();
+                            const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
+                            const className = (btn.className || '').toLowerCase();
+                            
+                            // Check if it's an X button
+                            if (text === '×' || text === '✕' || text === '✖' || 
+                                ariaLabel === 'close' || ariaLabel.includes('close') ||
+                                className.includes('close')) {
+                                
+                                // Skip if it's "continue" or "next"
+                                if (text.toLowerCase().includes('continue') || 
+                                    text.toLowerCase().includes('next') ||
+                                    ariaLabel.includes('continue')) {
+                                    continue;
+                                }
+                                
+                                const rect = btn.getBoundingClientRect();
+                                if (rect.width > 0 && rect.height > 0) {
+                                    btn.click();
+                                    return true;
+                                }
+                            }
+                        }
+                        
+                        // Also check SVG icons
+                        const svgs = document.querySelectorAll('svg');
+                        for (let svg of svgs) {
+                            const style = window.getComputedStyle(svg);
+                            if (style.display === 'none') continue;
+                            
+                            const ariaLabel = (svg.getAttribute('aria-label') || '').toLowerCase();
+                            const className = (svg.className?.baseVal || svg.className || '').toLowerCase();
+                            
+                            if (ariaLabel.includes('close') || className.includes('close')) {
+                                const parent = svg.closest('button, [role="button"], a, div, span');
+                                if (parent) {
+                                    parent.click();
+                                    return true;
+                                }
+                            }
+                        }
+                        
+                        return false;
+                    }
+                """)
+                
+                if clicked:
+                    print("CONTROLLER: ✓ Clicked X button via JavaScript")
+                    await asyncio.sleep(0.2)
+                    return True
+                
+                # Strategy 3: ESC key
+                if attempt >= 2:  # Try ESC after a few attempts
+                    try:
+                        await page.keyboard.press("Escape")
+                        await asyncio.sleep(0.2)
+                        print("CONTROLLER: ✓ Pressed ESC key")
+                        # Check if popup is gone
+                        still_there = await page.evaluate("""
+                            () => {
+                                const dialogs = document.querySelectorAll('[role="dialog"]');
+                                for (let d of dialogs) {
+                                    const style = window.getComputedStyle(d);
+                                    if (style.display !== 'none') return true;
+                                }
+                                return false;
+                            }
+                        """)
+                        if not still_there:
+                            return True
+                    except Exception:
+                        pass
+                
+                # Wait a bit before next attempt
+                if attempt < max_attempts - 1:
+                    await asyncio.sleep(0.3)
+                    
+            except Exception as e:
+                print(f"CONTROLLER: ⚠️ Popup dismissal attempt {attempt + 1} error: {e}")
+                if attempt < max_attempts - 1:
+                    await asyncio.sleep(0.3)
+        
+        print("CONTROLLER: ⚠️ Failed to dismiss popup after all attempts")
+        return False
+    
+    async def debug_popups(self) -> str:
+        """
+        Debug function to inspect what popups/overlays are currently on the page.
+        Returns a detailed report of potential popups.
+        """
+        page = self.browser.get_page()
+        if not page:
+            return "Browser not ready"
+        
+        try:
+            js_debug = """
+            () => {
+                const report = {
+                    dialogs: [],
+                    highZIndex: [],
+                    closeButtons: [],
+                    overlays: []
+                };
+                
+                // Find dialogs
+                const dialogs = document.querySelectorAll('[role="dialog"]');
+                dialogs.forEach((d, i) => {
+                    const style = window.getComputedStyle(d);
+                    report.dialogs.push({
+                        index: i,
+                        visible: style.display !== 'none',
+                        zIndex: style.zIndex,
+                        className: d.className,
+                        id: d.id
+                    });
+                });
+                
+                // Find high z-index elements
+                const allElements = document.querySelectorAll('*');
+                for (let el of allElements) {
+                    const style = window.getComputedStyle(el);
+                    const zIndex = parseInt(style.zIndex) || 0;
+                    if (zIndex >= 1000 && style.display !== 'none') {
+                        const rect = el.getBoundingClientRect();
+                        if (rect.width > 100 && rect.height > 100) {
+                            report.highZIndex.push({
+                                tag: el.tagName,
+                                zIndex: zIndex,
+                                className: el.className.substring(0, 50),
+                                id: el.id,
+                                size: `${Math.round(rect.width)}x${Math.round(rect.height)}`
+                            });
+                        }
+                    }
+                }
+                
+                // Find potential close buttons
+                const buttons = document.querySelectorAll('button, [role="button"]');
+                buttons.forEach((btn, i) => {
+                    const style = window.getComputedStyle(btn);
+                    if (style.display !== 'none') {
+                        const text = (btn.innerText || '').trim();
+                        const ariaLabel = btn.getAttribute('aria-label') || '';
+                        const className = btn.className || '';
+                        if (text.toLowerCase().includes('close') || 
+                            text === '×' || text === '✕' || text === '✖' ||
+                            ariaLabel.toLowerCase().includes('close') ||
+                            className.toLowerCase().includes('close')) {
+                            report.closeButtons.push({
+                                index: i,
+                                text: text,
+                                ariaLabel: ariaLabel,
+                                className: className.substring(0, 50),
+                                visible: style.display !== 'none'
+                            });
+                        }
+                    }
+                });
+                
+                // Find overlays/modals by class
+                const overlaySelectors = [
+                    '[class*="modal"]',
+                    '[class*="overlay"]',
+                    '[class*="popup"]',
+                    '[class*="Modal"]',
+                    '[class*="Overlay"]'
+                ];
+                
+                overlaySelectors.forEach(selector => {
+                    try {
+                        const els = document.querySelectorAll(selector);
+                        els.forEach(el => {
+                            const style = window.getComputedStyle(el);
+                            if (style.display !== 'none') {
+                                report.overlays.push({
+                                    selector: selector,
+                                    className: el.className.substring(0, 50),
+                                    id: el.id,
+                                    zIndex: style.zIndex
+                                });
+                            }
+                        });
+                    } catch(e) {}
+                });
+                
+                return report;
+            }
+            """
+            
+            result = await page.evaluate(js_debug)
+            
+            report_lines = ["=== POPUP DEBUG REPORT ==="]
+            report_lines.append(f"Dialogs found: {len(result.dialogs)}")
+            for d in result.dialogs:
+                report_lines.append(f"  - Dialog {d.index}: visible={d.visible}, zIndex={d.zIndex}, class={d.className[:30]}")
+            
+            report_lines.append(f"\nHigh z-index elements (>=1000): {len(result.highZIndex)}")
+            for z in result.highZIndex[:5]:  # Limit to first 5
+                report_lines.append(f"  - {z.tag}: zIndex={z.zIndex}, size={z.size}, class={z.className}")
+            
+            report_lines.append(f"\nClose buttons found: {len(result.closeButtons)}")
+            for cb in result.closeButtons[:10]:  # Limit to first 10
+                report_lines.append(f"  - Text: '{cb.text}', ariaLabel: '{cb.ariaLabel}', visible: {cb.visible}")
+            
+            report_lines.append(f"\nOverlays found: {len(result.overlays)}")
+            for ov in result.overlays[:5]:  # Limit to first 5
+                report_lines.append(f"  - {ov.selector}: class={ov.className}, zIndex={ov.zIndex}")
+            
+            report = "\n".join(report_lines)
+            print(report)
+            return report
+            
+        except Exception as e:
+            error_msg = f"Debug error: {e}"
+            print(error_msg)
+            return error_msg
+    
+    async def _start_popup_monitor(self, interval: float = 2.0):
+        """
+        Background task that periodically checks for and dismisses popups.
+        
+        Args:
+            interval: Seconds between popup checks (default 2.0 for faster checks)
+        """
+        while True:
+            try:
+                result = await self.dismiss_popups(grace_period=0.1)  # Minimal grace period
+                if result:
+                    print("CONTROLLER: 🔔 Background popup monitor dismissed a popup")
+                await asyncio.sleep(interval)
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                # Continue monitoring even if one check fails
+                await asyncio.sleep(interval)
+    
+    def start_popup_monitoring(self, interval: float = 3.0):
+        """
+        Start background popup monitoring.
+        
+        Args:
+            interval: Seconds between popup checks (default: 3.0)
+        """
+        if self._popup_check_task is None or self._popup_check_task.done():
+            self._popup_check_task = asyncio.create_task(self._start_popup_monitor(interval))
+            print(f"CONTROLLER: Started background popup monitoring (interval: {interval}s)")
+    
+    def stop_popup_monitoring(self):
+        """Stop background popup monitoring."""
+        if self._popup_check_task and not self._popup_check_task.done():
+            self._popup_check_task.cancel()
+            print("CONTROLLER: Stopped background popup monitoring")
+    
     # Tool Handlers
     
     async def _handle_search(self, query: str, max_price: Optional[float] = None) -> str:
@@ -271,8 +622,8 @@ Be helpful, proactive, and explain what you're doing."""
         if not success:
             return f"Failed to navigate to search results for '{query}'"
         
-        # Wait for results to load
-        await asyncio.sleep(2)
+        # Aggressively dismiss popups after navigation (they appear after page load)
+        await self.dismiss_popups(grace_period=0.5, max_attempts=3)
         
         # Extract listings
         dom_data = await extract_dom(page)
@@ -286,6 +637,9 @@ Be helpful, proactive, and explain what you're doing."""
     
     async def _handle_extract(self) -> str:
         """Handle extract_listings tool."""
+        # Dismiss any popups before extracting
+        await self.dismiss_popups(grace_period=0.2)
+        
         if not self.current_listings:
             page = self.browser.get_page()
             if page:
@@ -301,6 +655,9 @@ Be helpful, proactive, and explain what you're doing."""
     
     async def _handle_open_listing(self, listing_index: int) -> str:
         """Handle open_listing tool."""
+        # Dismiss any popups before opening listing
+        await self.dismiss_popups(grace_period=0.2)
+        
         if not self.current_listings:
             return "No listings available. Search first."
         
@@ -315,12 +672,16 @@ Be helpful, proactive, and explain what you're doing."""
         
         success = await self.browser.navigate(url)
         if success:
-            await asyncio.sleep(1)  # Wait for page load
+            await asyncio.sleep(0.5)  # Wait for page load
+            await self.dismiss_popups(grace_period=0.2)  # Check for popups after navigation
             return f"Opened listing: {listing['title']} (${listing['price']})"
         return f"Failed to open listing {listing_index}"
     
     async def _handle_open_chat(self, listing_index: int) -> str:
         """Handle open_chat tool."""
+        # Dismiss any popups before opening chat
+        await self.dismiss_popups(grace_period=0.2)
+        
         if not self.current_listings:
             return "No listings available. Search first."
         
@@ -337,7 +698,8 @@ Be helpful, proactive, and explain what you're doing."""
         url = listing.get("listing_url")
         if url and page.url != url:
             await self.browser.navigate(url)
-            await asyncio.sleep(2)
+            await asyncio.sleep(1)
+            await self.dismiss_popups(grace_period=0.2)  # Check for popups after navigation
         
         # Try to find and click chat button
         chat_selectors = [
@@ -360,6 +722,9 @@ Be helpful, proactive, and explain what you're doing."""
     
     async def _handle_delegate_lowball(self, listing_index: int) -> str:
         """Handle delegate_lowball tool with full navigation flow."""
+        # Dismiss any popups before starting
+        await self.dismiss_popups(grace_period=0.2)
+        
         if not self.current_listings:
             return "No listings available. Search first."
         
@@ -386,7 +751,8 @@ Be helpful, proactive, and explain what you're doing."""
             except:
                 print(f"CONTROLLER: Warning - Navigation timed out or URL doesn't look like a listing: {page.url}")
             
-            await asyncio.sleep(2)
+            await asyncio.sleep(1)
+            await self.dismiss_popups(grace_period=0.2)  # Check for popups after navigation
             
             # Step 2: Extract description and enriched details
             print("CONTROLLER: Reading listing description...")
@@ -440,8 +806,9 @@ Be helpful, proactive, and explain what you're doing."""
              await self.browser.screenshot("screenshots/chat_open_failed.png")
              return f"Could not find chat button on listing page. Please check the screenshot."
 
-        # Wait for chat page to load
-        await asyncio.sleep(4) 
+        # Wait for chat page to load and check for popups
+        await asyncio.sleep(2)
+        await self.dismiss_popups(grace_period=0.2)  # Check for popups after opening chat 
 
         # Lazy-load lowballer
         if self.lowballer is None:
@@ -485,6 +852,9 @@ if __name__ == "__main__":
         # Create controller
         controller = ControllerAgent(llm, browser)
         
+        # Start background popup monitoring
+        controller.start_popup_monitoring(interval=2.0)
+        
         # Test prompts
         test_prompts = [
             "Find iPhones under $3000",
@@ -498,6 +868,9 @@ if __name__ == "__main__":
         
         # Keep browser open for inspection
         await asyncio.sleep(10)
+        
+        # Stop popup monitoring before closing
+        controller.stop_popup_monitoring()
         await browser.close()
     
     asyncio.run(test_controller())
