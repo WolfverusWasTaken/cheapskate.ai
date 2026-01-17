@@ -271,13 +271,14 @@ Be helpful, proactive, and explain what you're doing."""
     
     # Popup Management
     
-    async def dismiss_popups(self, grace_period: float = 0.3, max_attempts: int = 5) -> bool:
+    async def dismiss_popups(self, grace_period: float = 0.2, max_attempts: int = 2) -> bool:
         """
-        Aggressive popup dismissal: Wait for popup, find X button, click immediately.
+        Fast popup dismissal: Check for popup, click X immediately.
+        Less sensitive to avoid false positives.
         
         Args:
-            grace_period: Wait time for popup to appear (default 0.3s)
-            max_attempts: Maximum attempts to dismiss (default 5)
+            grace_period: Wait time for popup to appear (default 0.2s)
+            max_attempts: Maximum attempts to dismiss (default 2 for speed)
             
         Returns:
             True if popup was dismissed, False otherwise
@@ -286,34 +287,41 @@ Be helpful, proactive, and explain what you're doing."""
         if not page:
             return False
         
-        print("CONTROLLER: 🧹 Checking for popups...")
-        
         # Wait for popup to appear
         if grace_period > 0:
             await asyncio.sleep(grace_period)
         
         for attempt in range(max_attempts):
             try:
-                # Check if popup exists using JavaScript (more reliable)
+                # Stricter popup detection - only real modals/overlays
                 popup_info = await page.evaluate("""
                     () => {
-                        // Find dialogs
+                        // Find dialogs - must be visible and cover significant area
                         const dialogs = document.querySelectorAll('[role="dialog"]');
                         for (let d of dialogs) {
                             const style = window.getComputedStyle(d);
-                            if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+                            if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') continue;
+                            
+                            const rect = d.getBoundingClientRect();
+                            // Must cover at least 30% of viewport to be considered a blocking popup
+                            const viewportArea = window.innerWidth * window.innerHeight;
+                            const dialogArea = rect.width * rect.height;
+                            if (dialogArea > viewportArea * 0.3 && rect.width > 200 && rect.height > 200) {
                                 return { found: true, type: 'dialog' };
                             }
                         }
                         
-                        // Find high z-index overlays
+                        // Find high z-index overlays - must be very large
                         const all = document.querySelectorAll('*');
                         for (let el of all) {
                             const style = window.getComputedStyle(el);
                             const zIndex = parseInt(style.zIndex) || 0;
                             if (zIndex >= 1000 && style.display !== 'none' && style.visibility !== 'hidden') {
                                 const rect = el.getBoundingClientRect();
-                                if (rect.width > window.innerWidth * 0.5 && rect.height > window.innerHeight * 0.5) {
+                                const viewportArea = window.innerWidth * window.innerHeight;
+                                const elementArea = rect.width * rect.height;
+                                // Must cover at least 40% of viewport
+                                if (elementArea > viewportArea * 0.4 && rect.width > 300 && rect.height > 300) {
                                     return { found: true, type: 'overlay', zIndex: zIndex };
                                 }
                             }
@@ -324,63 +332,58 @@ Be helpful, proactive, and explain what you're doing."""
                 """)
                 
                 if not popup_info.get('found'):
-                    if attempt == 0:
-                        print("CONTROLLER: ✓ No popup detected")
-                    return False  # No popup found
+                    return False  # No popup found, exit immediately
                 
-                print(f"CONTROLLER: 🔍 Popup detected (attempt {attempt + 1}/{max_attempts})")
-                
-                # Try multiple strategies to find and click X button
+                # Popup found, try to dismiss
+                # Strategy 1: Try Playwright locators (fastest)
                 x_selectors = [
                     'button:has-text("×")',
                     'button:has-text("✕")',
-                    'button:has-text("✖")',
                     'button[aria-label="Close"]',
                     'button[aria-label="close"]',
-                    'button[aria-label*="Close" i]',
                     'svg[aria-label="Close"]',
-                    'svg[aria-label="close"]',
-                    '[data-testid*="close" i]',
-                    '[class*="close"][class*="button"]',
-                    '[class*="CloseButton"]',
                 ]
                 
-                # Strategy 1: Try Playwright locators
                 for selector in x_selectors:
                     try:
                         locator = page.locator(selector).first
-                        if await locator.is_visible(timeout=500):
-                            await locator.click(timeout=1000)
-                            print(f"CONTROLLER: ✓ Clicked X button via selector: {selector}")
-                            await asyncio.sleep(0.2)  # Brief wait for popup to close
+                        if await locator.is_visible(timeout=300):
+                            await locator.click(timeout=500)
                             return True
-                    except Exception as e:
+                    except Exception:
                         continue
                 
-                # Strategy 2: JavaScript-based click (more reliable for dynamic content)
+                # Strategy 2: JavaScript-based click (fixed SVG handling)
                 clicked = await page.evaluate("""
                     () => {
+                        // Helper to safely get className (handles SVGAnimatedString)
+                        const getClassName = (el) => {
+                            if (!el || !el.className) return '';
+                            if (typeof el.className === 'string') return el.className;
+                            if (el.className.baseVal !== undefined) {
+                                const baseVal = el.className.baseVal;
+                                return typeof baseVal === 'string' ? baseVal : String(baseVal);
+                            }
+                            return String(el.className);
+                        };
+                        
                         // Find all buttons and check for X/close
-                        const buttons = document.querySelectorAll('button, [role="button"], a, div[onclick], span[onclick]');
+                        const buttons = document.querySelectorAll('button, [role="button"]');
                         for (let btn of buttons) {
                             const style = window.getComputedStyle(btn);
                             if (style.display === 'none' || style.visibility === 'hidden') continue;
                             
                             const text = (btn.innerText || btn.textContent || '').trim();
                             const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
-                            const className = (btn.className || '').toLowerCase();
+                            const className = getClassName(btn).toLowerCase();
                             
                             // Check if it's an X button
-                            if (text === '×' || text === '✕' || text === '✖' || 
-                                ariaLabel === 'close' || ariaLabel.includes('close') ||
-                                className.includes('close')) {
-                                
-                                // Skip if it's "continue" or "next"
-                                if (text.toLowerCase().includes('continue') || 
-                                    text.toLowerCase().includes('next') ||
-                                    ariaLabel.includes('continue')) {
-                                    continue;
-                                }
+                            if ((text === '×' || text === '✕' || text === '✖' || 
+                                 ariaLabel === 'close' || ariaLabel.includes('close') ||
+                                 className.includes('close')) &&
+                                !text.toLowerCase().includes('continue') &&
+                                !text.toLowerCase().includes('next') &&
+                                !ariaLabel.includes('continue')) {
                                 
                                 const rect = btn.getBoundingClientRect();
                                 if (rect.width > 0 && rect.height > 0) {
@@ -390,14 +393,14 @@ Be helpful, proactive, and explain what you're doing."""
                             }
                         }
                         
-                        // Also check SVG icons
+                        // Check SVG icons (with proper className handling)
                         const svgs = document.querySelectorAll('svg');
                         for (let svg of svgs) {
                             const style = window.getComputedStyle(svg);
                             if (style.display === 'none') continue;
                             
                             const ariaLabel = (svg.getAttribute('aria-label') || '').toLowerCase();
-                            const className = (svg.className?.baseVal || svg.className || '').toLowerCase();
+                            const className = getClassName(svg).toLowerCase();
                             
                             if (ariaLabel.includes('close') || className.includes('close')) {
                                 const parent = svg.closest('button, [role="button"], a, div, span');
@@ -413,42 +416,26 @@ Be helpful, proactive, and explain what you're doing."""
                 """)
                 
                 if clicked:
-                    print("CONTROLLER: ✓ Clicked X button via JavaScript")
-                    await asyncio.sleep(0.2)
                     return True
                 
-                # Strategy 3: ESC key
-                if attempt >= 2:  # Try ESC after a few attempts
+                # Strategy 3: ESC key (only on second attempt)
+                if attempt >= 1:
                     try:
                         await page.keyboard.press("Escape")
-                        await asyncio.sleep(0.2)
-                        print("CONTROLLER: ✓ Pressed ESC key")
-                        # Check if popup is gone
-                        still_there = await page.evaluate("""
-                            () => {
-                                const dialogs = document.querySelectorAll('[role="dialog"]');
-                                for (let d of dialogs) {
-                                    const style = window.getComputedStyle(d);
-                                    if (style.display !== 'none') return true;
-                                }
-                                return false;
-                            }
-                        """)
-                        if not still_there:
-                            return True
+                        await asyncio.sleep(0.1)
+                        return True
                     except Exception:
                         pass
                 
-                # Wait a bit before next attempt
+                # Brief wait before next attempt
                 if attempt < max_attempts - 1:
-                    await asyncio.sleep(0.3)
+                    await asyncio.sleep(0.2)
                     
-            except Exception as e:
-                print(f"CONTROLLER: ⚠️ Popup dismissal attempt {attempt + 1} error: {e}")
+            except Exception:
+                # Silently continue - don't spam errors for false positives
                 if attempt < max_attempts - 1:
-                    await asyncio.sleep(0.3)
+                    await asyncio.sleep(0.1)
         
-        print("CONTROLLER: ⚠️ Failed to dismiss popup after all attempts")
         return False
     
     async def debug_popups(self) -> str:
@@ -637,8 +624,8 @@ Be helpful, proactive, and explain what you're doing."""
         if not success:
             return f"Failed to navigate to search results for '{query}'"
         
-        # Aggressively dismiss popups after navigation (they appear after page load)
-        await self.dismiss_popups(grace_period=0.5, max_attempts=3)
+        # Dismiss popups after navigation (they appear after page load)
+        await self.dismiss_popups(grace_period=0.3, max_attempts=2)
         
         # Extract listings
         dom_data = await extract_dom(page)
