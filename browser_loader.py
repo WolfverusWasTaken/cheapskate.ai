@@ -156,11 +156,10 @@ class BrowserLoader:
     async def handle_carousell_popups(self):
         """Aggressive popup dismissal: Wait for popup, find X, click immediately."""
         try:
-<<<<<<< Updated upstream
             # Wait a moment for popup to appear
             await asyncio.sleep(0.3)
             
-            # Check for popup
+            # Check for popup via JavaScript
             has_overlay = await self._page.evaluate("""
                 () => {
                     const dialogs = document.querySelectorAll('[role="dialog"]');
@@ -185,13 +184,14 @@ class BrowserLoader:
                         const style = window.getComputedStyle(btn);
                         if (style.display === 'none') continue;
                         
-                        const text = (btn.innerText || '').trim();
+                        const text = (btn.innerText || '').trim().toLowerCase();
                         const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
                         
+                        // Check for close/dismiss buttons
                         if ((text === '×' || text === '✕' || text === '✖' || 
+                             text === 'okay' || text === 'got it' || text === 'close' ||
                              ariaLabel === 'close' || ariaLabel.includes('close')) &&
-                            !text.toLowerCase().includes('continue') &&
-                            !text.toLowerCase().includes('next')) {
+                            !text.includes('continue') && !text.includes('next')) {
                             btn.click();
                             return true;
                         }
@@ -205,59 +205,29 @@ class BrowserLoader:
                 await asyncio.sleep(0.2)
                 return
             
-            # Fallback: Try selectors
-            x_selectors = [
+            # Fallback: Try CSS selectors
+            popup_selectors = [
+                'button:has-text("Okay")',
+                'button:has-text("Got it")',
+                'button:has-text("Close")',
                 'button:has-text("×")',
                 'button:has-text("✕")',
                 'button[aria-label="Close"]',
-=======
-            # Common Carousell popup elements
-            popup_selectors = [
-                'button:has-text("Okay")',            # Cart tooltip dismissal
-                'button:has-text("Next")',
-                'button:has-text("Got it")',
-                'button:has-text("Close")',
-                'text="Okay"',                        # Cart tooltip dismissal
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
+                'text="Okay"',
                 'svg[aria-label="Close"]',
             ]
             
-<<<<<<< Updated upstream
-            for selector in x_selectors:
+            for selector in popup_selectors:
                 try:
                     btn = await self._page.query_selector(selector)
-                    if btn and await btn.is_visible(timeout=500):
-                        await btn.click(timeout=1000)
+                    if btn and await btn.is_visible():
+                        await btn.click()
                         print(f"BROWSER: ✓ Closed popup via selector: {selector}")
+                        await asyncio.sleep(0.2)
                         return
                 except:
                     continue
                     
-=======
-            # Try to clear up to 3 layers of popups (onboarding often has multiple steps)
-            for i in range(3):
-                found_popup = False
-                for selector in popup_selectors:
-                    try:
-                        # Use a very short timeout for popup checks
-                        btn = await self._page.query_selector(selector)
-                        if btn and await btn.is_visible():
-                            # Confirm it's not a button we actually want (like 'Search')
-                            text = await btn.inner_text()
-                            if text.lower() in ["next", "got it", "close", "okay", ""] or not text:
-                                print(f"BROWSER: 🖱️ Clicking popup button: '{text}' ({selector})")
-                                await btn.click()
-                                await asyncio.sleep(1)
-                                found_popup = True
-                                break 
-                    except:
-                        continue
-                if not found_popup:
-                    break
->>>>>>> Stashed changes
         except Exception as e:
             print(f"BROWSER: ⚠️ Popup handling error: {e}")
 
@@ -270,30 +240,8 @@ class BrowserLoader:
             # Short wait for any dynamic tab loaders
             await asyncio.sleep(1.5)
             
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
             # Check popup again before interacting (popups can appear late)
             await self.handle_carousell_popups()
-            
-            # Look for "All" tab. Carousell often defaults to "Certified" for high-intent searches.
-            # We want to see EVERYTHING.
-            all_tab_selectors = [
-                'p:has-text("All")',
-                'span:has-text("All")',
-                'button:has-text("All")',
-                'div[role="tab"]:has-text("All")',
-                'a:has-text("All")'
-            ]
-=======
-            # Look for "All" tab in the filter bar area only
-            # Be VERY specific to avoid clicking random elements
-            # The tab bar on Carousell is typically at the top, with tabs like "All", "Certified"
->>>>>>> Stashed changes
-=======
-            # Look for "All" tab in the filter bar area only
-            # Be VERY specific to avoid clicking random elements
-            # The tab bar on Carousell is typically at the top, with tabs like "All", "Certified"
->>>>>>> Stashed changes
             
             # First, check if we're on a page that has the "Certified" tab (which means "All" tab exists)
             certified_tab = await self._page.query_selector('text="Certified"')
