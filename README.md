@@ -161,10 +161,43 @@ Round 4+: 70% max, then walk away
 
 ---
 
+## 🖥 Dashboard (Tauri + React)
+
+A native desktop app for tracking negotiations and monitoring listings.
+
+### Features
+- **Browser Tab** - Embedded Playwright view (coming soon)
+- **Dashboard Tab** - Item cards with price stats (lowest/avg/highest)
+- **Expandable Negotiations** - View chat history per seller
+- **Light Mode UI** - Clean, modern interface
+
+### Run Dashboard
+```bash
+cd dashboard
+
+# Web only (browser)
+npm run dev
+
+# Native app (Tauri)
+npm run tauri:dev
+```
+
+### Tech Stack
+- React + Vite (frontend)
+- Tauri v2 + Rust (native wrapper)
+- Reads from `chat_history.json`
+
+---
+
 ## 📁 Project Structure
 
 ```
 CrackDSabR/
+├── 📂 dashboard/                 # Tauri + React dashboard
+│   ├── src/                      # React components
+│   ├── src-tauri/                # Rust backend
+│   └── package.json
+│
 ├── 📂 mocks/                    # Mock modules for independent testing
 │   ├── __init__.py
 │   ├── mock_browser.py          # Fake browser for Dev 2/3
