@@ -1,0 +1,436 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f5f5f7;
+  color: #1d1d1f;
+  min-height: 100vh;
+}
+
+.app {
+  width: 100%;
+  max-width: 100%;
+  padding: 20px 48px;
+}
+
+/* Header & Tabs */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #d2d2d7;
+}
+
+.header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  background: #e8e8ed;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.tab {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab:hover {
+  color: #1d1d1f;
+}
+
+.tab.active {
+  background: #fff;
+  color: #1d1d1f;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Main */
+.main {
+  min-height: 500px;
+}
+
+/* Browser Placeholder */
+.browser-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 500px;
+  background: #fff;
+  border-radius: 12px;
+  border: 2px dashed #d2d2d7;
+  color: #86868b;
+}
+
+.placeholder-icon {
+  font-size: 4rem;
+  margin-bottom: 16px;
+}
+
+.browser-placeholder p {
+  font-size: 1.1rem;
+  color: #1d1d1f;
+}
+
+.placeholder-hint {
+  font-size: 0.85rem;
+  margin-top: 8px;
+}
+
+/* Item List */
+.item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Item Card */
+.item-card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #d2d2d7;
+  overflow: hidden;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.item-card.expanded {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.item-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  cursor: pointer;
+  transition: background 0.2s;
+  width: 100%;
+}
+
+.item-card-header:hover {
+  background: #f9f9fb;
+}
+
+.item-info {
+  flex: 1;
+}
+
+.item-name {
+  font-weight: 600;
+  font-size: 1rem;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.item-meta {
+  font-size: 0.8rem;
+  color: #86868b;
+}
+
+.active-badge {
+  background: #d1fae5;
+  color: #065f46;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+.price-stats {
+  display: flex;
+  gap: 32px;
+  margin-left: auto;
+  margin-right: 24px;
+}
+
+.price-stat {
+  text-align: center;
+}
+
+.price-value {
+  font-weight: 600;
+  font-size: 1rem;
+  display: block;
+}
+
+.price-value.low { color: #059669; }
+.price-value.avg { color: #d97706; }
+.price-value.high { color: #dc2626; }
+
+.price-label {
+  font-size: 0.65rem;
+  color: #86868b;
+  text-transform: uppercase;
+}
+
+.chevron {
+  color: #86868b;
+  font-size: 0.7rem;
+  transition: transform 0.2s;
+}
+
+.chevron.open {
+  transform: rotate(180deg);
+}
+
+/* Item Card Content (expanded) */
+.item-card-content {
+  padding: 0 20px 20px;
+  border-top: 1px solid #e8e8ed;
+}
+
+.section {
+  margin-top: 16px;
+}
+
+.section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #86868b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+/* Other Listings */
+.other-listings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.listing-chip {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 12px;
+  background: #f5f5f7;
+  border-radius: 20px;
+  font-size: 0.8rem;
+}
+
+.listing-seller {
+  color: #86868b;
+}
+
+.listing-price {
+  font-weight: 600;
+  color: #059669;
+}
+
+/* Negotiation List */
+.negotiation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Negotiation Card */
+.negotiation-card {
+  background: #f5f5f7;
+  border-radius: 8px;
+  border: 1px solid #e8e8ed;
+  overflow: hidden;
+}
+
+.negotiation-card.accepted {
+  border-left: 3px solid #3b82f6;
+}
+
+.negotiation-card.walked_away {
+  border-left: 3px solid #ef4444;
+}
+
+.negotiation-card.active {
+  border-left: 3px solid #10b981;
+}
+
+.neg-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.neg-header:hover {
+  background: #ebebf0;
+}
+
+.neg-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+
+.neg-seller {
+  font-weight: 500;
+  color: #1d1d1f;
+}
+
+.neg-price {
+  color: #86868b;
+}
+
+.neg-round {
+  color: #86868b;
+}
+
+.neg-status {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.neg-status.active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.neg-status.accepted {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.neg-status.walked_away {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.neg-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.last-offer {
+  font-size: 0.8rem;
+  color: #059669;
+  font-weight: 500;
+}
+
+.chat-toggle {
+  font-size: 0.75rem;
+  color: #3b82f6;
+  font-weight: 500;
+}
+
+/* Chat History */
+.chat-history {
+  padding: 12px 14px;
+  border-top: 1px solid #e8e8ed;
+  background: #fff;
+}
+
+.deal-banner {
+  background: #dbeafe;
+  color: #1e40af;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.chat-msg {
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+}
+
+.chat-msg.lowballer {
+  background: #eff6ff;
+  margin-left: 16px;
+}
+
+.chat-msg.seller {
+  background: #fef9e7;
+  margin-right: 16px;
+}
+
+.msg-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.msg-role {
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.chat-msg.lowballer .msg-role { color: #1e40af; }
+.chat-msg.seller .msg-role { color: #92400e; }
+
+.msg-round {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.msg-round.round-1 { background: #fee2e2; color: #991b1b; }
+.msg-round.round-2 { background: #fef3c7; color: #92400e; }
+.msg-round.round-3 { background: #d1fae5; color: #065f46; }
+.msg-round.round-4 { background: #dbeafe; color: #1e40af; }
+.msg-round.round-5 { background: #ede9fe; color: #5b21b6; }
+
+.msg-time {
+  font-size: 0.65rem;
+  color: #86868b;
+  margin-left: auto;
+}
+
+.msg-text {
+  color: #1d1d1f;
+  line-height: 1.4;
+}
+
+.msg-offer {
+  display: inline-block;
+  margin-top: 6px;
+  font-weight: 600;
+  color: #059669;
+  font-size: 0.8rem;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f5f5f7;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d2d2d7;
+  border-radius: 3px;
+}
