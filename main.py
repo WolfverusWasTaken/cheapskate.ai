@@ -17,6 +17,7 @@ from browser_loader import BrowserLoader
 from controller import ControllerAgent
 from llm_factory import LLMFactory
 from config import config
+from bridge_server import BridgeServer
 
 
 # ASCII Art Banner
@@ -92,14 +93,57 @@ async def main():
         llm = LLMFactory.from_env()
         controller = ControllerAgent(llm, browser)
         
+        # Initialize Bridge for Tauri dashboard
+        bridge = BridgeServer(port=5001)
+        asyncio.create_task(bridge.start())
+        
         print("\n✅ Agent ready! Type 'help' for commands.\n")
         print(HELP_TEXT)
-        
-        # Main CLI loop
+        bridge.add_log("SYSTEM", "Agent started and connected to browser.")
+
+        async def get_stdin_input():
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, sys.stdin.readline)
+
+        # Main loop
         while True:
             try:
-                # Get user input
-                prompt = input("\n>>> ").strip()
+                # Check if background stream detected a new message
+                if browser.pending_chat_action:
+                    browser.pending_chat_action = False  # Clear flag
+                    print("\n🤖 [AUTO] Processing new message from inbox...")
+                    bridge.add_log("AGENT", "Auto-detected new message, processing...")
+                    result = await controller.run("go to the inbox and stay updated")
+                    print(f"\n{result}")
+                    bridge.add_log("AGENT", result)
+                    continue
+
+                # Wait for input from either Terminal (stdin) or Bridge (Tauri)
+                bridge_cmd_task = asyncio.create_task(bridge.command_queue.get())
+                stdin_task = asyncio.create_task(get_stdin_input())
+                
+                # Use timeout to periodically check pending_chat_action
+                done, pending = await asyncio.wait(
+                    [bridge_cmd_task, stdin_task],
+                    return_when=asyncio.FIRST_COMPLETED,
+                    timeout=2.0  # Short timeout to check for auto-actions
+                )
+                
+                # Cleanup pending tasks
+                for task in pending:
+                    task.cancel()
+                
+                # If timeout, loop back to check pending_chat_action
+                if not done:
+                    continue
+                
+                # Determine source
+                if bridge_cmd_task in done:
+                    prompt = bridge_cmd_task.result().strip()
+                    print(f"\n[DASHBOARD] >>> {prompt}")
+                    bridge.add_log("USER", prompt)
+                else:
+                    prompt = stdin_task.result().strip()
                 
                 if not prompt:
                     continue
@@ -157,8 +201,12 @@ async def main():
                 
                 # Process through controller
                 print(f"\n🤖 Processing...")
+                bridge.add_log("AGENT", "Processing command...")
+                
                 result = await controller.run(prompt)
+                
                 print(f"\n{result}")
+                bridge.add_log("AGENT", result)
                 
             except KeyboardInterrupt:
                 print("\n\n⚠️ Interrupted. Type 'quit' to exit or continue...")

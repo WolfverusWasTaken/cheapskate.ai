@@ -863,30 +863,79 @@ Be helpful, proactive, and explain what you're doing."""
         return result
 
     async def _handle_check_chat(self) -> str:
-        """Handle check_chat tool by monitoring for new messages and replying."""
-        print("CONTROLLER: 👀 Starting smart message check...")
+        """
+        Reply mode: Go to inbox, open unread chats, sync history, reply, then go home.
         
-        # Use the new check_for_new_messages method
-        has_new_message = await self.browser.check_for_new_messages(interval=7, max_checks=15)
+        Flow: inbox → click chat → scan → reply → next chat → if done → homepage
+        """
+        print("CONTROLLER: 📬 Entering reply mode...")
         
-        if not has_new_message:
-            return "No new messages detected after checking. The agent is now idle."
+        # Ensure lowballer is initialized
+        if self.lowballer is None:
+            from lowballer import LowballerAgent
+            self.lowballer = LowballerAgent(self.llm)
         
-        # New message detected! Navigate to inbox
-        print("CONTROLLER: 💬 New message detected! Navigating to inbox...")
-        inbox_url = "https://www.carousell.sg/inbox/"
-        success = await self.browser.navigate(inbox_url)
-        
+        # Step 1: Go directly to inbox (no homepage refresh loop)
+        print("CONTROLLER: Going to inbox...")
+        success = await self.browser.navigate("https://www.carousell.sg/inbox/")
         if not success:
-            return "New message detected but failed to navigate to inbox."
+            return "Failed to navigate to inbox."
         
-        await asyncio.sleep(2) # Allow inbox to load
+        await asyncio.sleep(2)
+        await self.browser.handle_carousell_popups()
         
-        # TODO: Future enhancement - scrape the latest conversation and generate a reply
-        # For now, just notify the user
-        print("CONTROLLER: ✅ Inbox opened. You can see the new message in the browser.")
+        # Step 2: Find unread chats
+        unread_chats = await self.browser.parse_inbox_messages()
+        if not unread_chats:
+            print("CONTROLLER: No unread messages. Returning to homepage...")
+            await self.browser.navigate("https://www.carousell.sg")
+            return "✅ Inbox checked. No new messages. Back to idle."
         
-        return "💬 New message detected! I've opened the inbox for you to review."
+        print(f"CONTROLLER: Found {len(unread_chats)} unread chats to process!")
+        replied_count = 0
+        
+        # Step 3: Process each unread chat
+        for chat in unread_chats:
+            seller_name = chat.get('seller', 'Unknown')
+            message_snippet = chat.get('message', '')[:50]
+            print(f"\nCONTROLLER: 💬 Opening chat with {seller_name}...")
+            print(f"CONTROLLER: Last message: \"{message_snippet}...\"")
+            
+            # Click the chat to open it
+            clicked = await self.browser.click_inbox_chat(chat['index'])
+            if not clicked:
+                print(f"CONTROLLER: ⚠️ Failed to click chat {chat['index']}, skipping...")
+                continue
+            
+            await asyncio.sleep(1.5)  # Wait for chat to load
+            
+            # Step 4: Scan chat and sync with local history
+            # We need listing data - try to get it from existing history or create dummy
+            dummy_listing = {
+                "seller_name": seller_name,
+                "title": message_snippet,
+                "price": 100  # Placeholder price for reply generation
+            }
+            
+            print("CONTROLLER: Syncing conversation from page...")
+            new_msgs = await self.lowballer.sync_conversation(dummy_listing, self.browser.get_page())
+            
+            if new_msgs:
+                print(f"CONTROLLER: Found {len(new_msgs)} new message(s) from seller")
+            
+            # Step 5: Generate and send reply
+            print("CONTROLLER: Generating reply...")
+            reply_result = await self.lowballer.negotiate(dummy_listing, self.browser.get_page())
+            print(f"CONTROLLER: → {reply_result}")
+            replied_count += 1
+            
+            await asyncio.sleep(1)
+        
+        # Step 6: Done with all chats, go back to homepage (idle)
+        print("\nCONTROLLER: All chats processed. Returning to homepage...")
+        await self.browser.navigate("https://www.carousell.sg")
+        
+        return f"✅ Reply mode complete. Processed {len(unread_chats)} chats, replied to {replied_count}. Now idle."
     
     async def _handle_screenshot(self, filename: Optional[str] = None) -> str:
         """Handle take_screenshot tool."""

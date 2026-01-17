@@ -219,28 +219,43 @@ class LowballerAgent:
         print(f"\nLOWBALLER: Starting negotiation for '{item_name}' @ ${listing_price}")
         print(f"LOWBALLER: Seller ID: {seller_id}")
         
-        # Initialize chat history for this seller if needed
-        if seller_id not in self.chat_history:
-            self.chat_history[seller_id] = {
-                "listing": listing_data,
-                "started_at": datetime.now().isoformat(),
-                "messages": [],
-                "current_round": 0,
-                "status": "active",
-            }
+        # Step 0: Sync with the page to see where we left off
+        await self.sync_conversation(listing_data, page)
         
         chat = self.chat_history[seller_id]
         current_round = chat["current_round"] + 1
         
-        # Check if we've exceeded max rounds
-        if current_round > self.max_rounds:
-            chat["status"] = "walked_away"
-            self._save_chat_history()
-            return f"LOWBALLER: Max rounds ({self.max_rounds}) reached. Walking away from {item_name}."
+        # Use LLM to analyze if seller has accepted
+        seller_messages = [m for m in chat.get("messages", []) if m.get("role") == "seller"]
+        if seller_messages:
+            last_seller_msg = seller_messages[-1].get("content", "")
+            
+            # Ask LLM to classify the response
+            analysis = await self._analyze_seller_response(last_seller_msg, chat.get("messages", []))
+            
+            if analysis == "ACCEPT":
+                chat["status"] = "accepted"
+                self._save_chat_history()
+                confirm_msg = "Great! When and where can I collect? Cash ready 👍"
+                await self._send_message(page, confirm_msg)
+                print(f"LOWBALLER: 🎉 DEAL ACCEPTED! Seller said: \"{last_seller_msg}\"")
+                return f"LOWBALLER: 🎉 DEAL ACCEPTED! Seller agreed. Confirmation sent."
+            elif analysis == "REJECT":
+                print(f"LOWBALLER: Seller rejected. Continuing negotiation...")
         
-        # Calculate offer for this round
-        offer_price = self._calculate_offer(listing_price, current_round)
-        offer_percent = int((offer_price / listing_price) * 100)
+        # Check if we have accurate listing price (not a placeholder)
+        has_accurate_price = listing_price > 100  # Placeholder is usually $100
+        
+        if has_accurate_price:
+            # Calculate offer for this round (cap at round 4 for Ackerman)
+            effective_round = min(current_round, 4)
+            offer_price = self._calculate_offer(listing_price, effective_round)
+            offer_percent = int((offer_price / listing_price) * 100)
+            print(f"LOWBALLER: Round {current_round} - Ackerman offer ${offer_price} ({offer_percent}% of ${listing_price})")
+        else:
+            # No accurate price - let LLM decide based on context
+            offer_price = None
+            print(f"LOWBALLER: Round {current_round} - LLM will decide offer based on conversation")
         
         # Generate negotiation message
         if initial_message:
@@ -248,7 +263,6 @@ class LowballerAgent:
         else:
             message = await self._generate_message(item_name, listing_price, offer_price, current_round, listing_data)
         
-        print(f"LOWBALLER: Round {current_round} - Offering ${offer_price} ({offer_percent}% of ${listing_price})")
         print(f"LOWBALLER: Message → \"{message}\"")
         
         # Try to type the message in chat
@@ -258,7 +272,7 @@ class LowballerAgent:
         chat["messages"].append({
             "role": "lowballer",
             "content": message,
-            "offer_price": offer_price,
+            "offer_price": offer_price if offer_price else "contextual",
             "round": current_round,
             "timestamp": datetime.now().isoformat(),
             "sent": sent,
@@ -267,10 +281,54 @@ class LowballerAgent:
         self._save_chat_history()
         
         if sent:
-            return f"LOWBALLER: Sent offer ${offer_price} for {item_name}"
+            return f"LOWBALLER: Sent message for {item_name} (Round {current_round})"
         else:
-            return f"LOWBALLER: Generated offer ${offer_price} for {item_name} (chat input not found - may need to open chat first)"
+            return f"LOWBALLER: Generated message for {item_name} (chat input not found)"
     
+    async def _analyze_seller_response(self, seller_message: str, chat_history: list) -> str:
+        """
+        Use LLM to analyze if seller's response indicates acceptance, rejection, or counter-offer.
+        
+        Returns: "ACCEPT", "COUNTER", or "REJECT"
+        """
+        history_text = "\n".join([f"{m.get('role', 'unknown')}: {m.get('content', '')}" for m in chat_history[-8:]])
+        
+        messages = [
+            {
+                "role": "system",
+                "content": """You are analyzing a Carousell negotiation chat. 
+Your job is to classify the seller's LAST message into one of three categories:
+- ACCEPT: Seller agrees to the buyer's price/offer (e.g., "ok deal", "can", "sure", "yes", "come collect")
+- COUNTER: Seller proposes a different price or asks for more (e.g., "can you do $X?", "how about $X?", "too low")
+- REJECT: Seller firmly rejects without counter (e.g., "no", "not selling", "firm price", "sorry")
+
+Reply with ONLY one word: ACCEPT, COUNTER, or REJECT"""
+            },
+            {
+                "role": "user",
+                "content": f"""CHAT HISTORY:
+{history_text}
+
+SELLER'S LAST MESSAGE: "{seller_message}"
+
+Classify this response:"""
+            }
+        ]
+        
+        try:
+            response = await self.llm.complete(messages, max_tokens=10)
+            result = response.get("content", "").strip().upper()
+            
+            if "ACCEPT" in result:
+                return "ACCEPT"
+            elif "REJECT" in result:
+                return "REJECT"
+            else:
+                return "COUNTER"
+        except Exception as e:
+            print(f"LOWBALLER: Analysis failed ({e}), assuming COUNTER")
+            return "COUNTER"
+
     async def _generate_message(
         self,
         item_name: str,
@@ -291,6 +349,11 @@ class LowballerAgent:
         # Get round-specific tactical context
         context = ROUND_CONTEXTS.get(round_num, "Make a reasonable counteroffer. Be friendly but firm.")
 
+        # Get full chat history for context
+        seller_id = self._get_seller_id(listing_data)
+        history = self.chat_history.get(seller_id, {}).get("messages", [])
+        history_text = "\n".join([f"{m['role']}: {m['content']}" for m in history[-10:]]) # Last 10 msgs
+
         messages = [
             {
                 "role": "system",
@@ -305,7 +368,9 @@ Listed Price: S${listing_price}
 Your Offer: S${offer_price}
 Round: {round_num}
 Description: {listing_data.get('description', 'N/A')}
-Details: {json.dumps(listing_data.get('structured_details', {}), indent=2)}
+
+CHAT HISTORY:
+{history_text}
 
 TACTICAL GUIDANCE:
 {context}
@@ -439,36 +504,95 @@ Write ONLY the message itself, nothing else. Keep it to 1-2 sentences max."""
             await page.screenshot(path="screenshots/chat_input_not_found.png")
             return False
     
-    async def extract_seller_reply(self, page: Any) -> Optional[str]:
+    async def sync_conversation(self, listing_data: dict, page: Any) -> list[dict]:
         """
-        Extract the latest seller reply from the chat.
+        Scrapes the chat from the page and synchronizes it with local history.
+        Identifies new seller messages and updates the negotiation round.
         
-        Args:
-            page: Playwright page object
-            
         Returns:
-            Latest seller message or None
+            List of new messages from the seller.
         """
         if page is None:
-            return None
-        
-        try:
-            # Try to get chat messages
-            messages = await page.evaluate("""
-                () => {
-                    const messages = document.querySelectorAll('[class*="message"], [class*="chat"] p, [class*="bubble"]');
-                    return Array.from(messages).map(m => m.textContent.trim()).slice(-5);
-                }
-            """)
+            return []
             
-            if messages:
-                # Return the last message (likely seller's reply)
-                return messages[-1]
-                
-        except Exception as e:
-            print(f"LOWBALLER: ✗ Failed to extract reply: {e}")
+        seller_id = self._get_seller_id(listing_data)
+        if seller_id not in self.chat_history:
+            self.chat_history[seller_id] = {
+                "listing": listing_data,
+                "started_at": datetime.now().isoformat(),
+                "messages": [],
+                "current_round": 0,
+                "status": "active",
+            }
+            
+        print(f"LOWBALLER: Synchronizing chat for {seller_id}...")
         
-        return None
+        # Scrape all messages from the page
+        scraped_messages = await page.evaluate("""
+            () => {
+                const msgs = [];
+                // D_cbh is the general message container
+                const elements = document.querySelectorAll('div[id^="chat-message-"], .D_cbh');
+                
+                elements.forEach(el => {
+                    // D_cbq is usually buyer (me), D_cbr is usually seller (them)
+                    const isMe = el.querySelector('.D_cbq') !== null;
+                    const isThem = el.querySelector('.D_cbr') !== null;
+                    
+                    const textEl = el.querySelector('p.D_cBA');
+                    if (!textEl) return;
+                    
+                    const text = textEl.innerText.trim();
+                    if (text) {
+                        msgs.push({
+                            role: isMe ? "lowballer" : "seller",
+                            content: text
+                        });
+                    }
+                });
+                return msgs;
+            }
+        """)
+        
+        if not scraped_messages:
+            return []
+            
+        existing_history = self.chat_history[seller_id]["messages"]
+        new_messages = []
+        
+        # Simple synchronization: Check if scraped messages appear in our history
+        # We start from the end to find what's new
+        for scraped in scraped_messages:
+            # Check if this message (by content and role) already exists in our history
+            # This is a bit naive but works for the sequence
+            is_new = True
+            for hist in existing_history:
+                if hist["role"] == scraped["role"] and hist["content"] == scraped["content"]:
+                    is_new = False
+                    break
+            
+            if is_new:
+                print(f"LOWBALLER: ✨ New message from {scraped['role']}: {scraped['content'][:30]}...")
+                msg_entry = {
+                    "role": scraped["role"],
+                    "content": scraped["content"],
+                    "timestamp": datetime.now().isoformat(),
+                    "synced": True
+                }
+                existing_history.append(msg_entry)
+                if scraped["role"] == "seller":
+                    new_messages.append(msg_entry)
+        
+        # Update current round based on how many "lowballer" messages were sent
+        sent_rounds = len([m for m in existing_history if m["role"] == "lowballer"])
+        self.chat_history[seller_id]["current_round"] = sent_rounds
+        
+        self._save_chat_history()
+        return new_messages
+
+    async def extract_seller_reply(self, page: Any) -> Optional[str]:
+        # Implementation remains for compatibility but sync_conversation is preferred
+        pass
     
     async def respond_to_counter(self, listing_data: dict, page: Any, seller_price: float) -> str:
         """

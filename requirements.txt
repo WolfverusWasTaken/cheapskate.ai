@@ -6,3 +6,4 @@ python-dotenv>=1.0.0
 pydantic>=2.0.0
 asyncio-atexit>=1.0.1
 aiofiles>=23.0.0
+playwright-stealth>=1.0.6

@@ -33,6 +33,9 @@ class BrowserLoader:
         self._context: Optional[BrowserContext] = None
         self._page: Optional[Page] = None
         self._launched = False
+        self._stream_task: Optional[asyncio.Task] = None
+        self._streaming = False
+        self.pending_chat_action = False  # Flag for main loop to process
         
     async def launch(self) -> tuple[Browser, BrowserContext, Page]:
         """
@@ -67,16 +70,58 @@ class BrowserLoader:
         if storage_state:
             print(f"BROWSER: Loading session from {auth_path}")
             
-        self._context = await self._browser.new_context(
-            viewport={'width': 1920, 'height': 1080},  # Full HD 16:9 aspect ratio
-            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            locale='en-SG',
-            timezone_id='Asia/Singapore',
-            storage_state=storage_state
-        )
+        # Use native window size in headful mode to avoid "flushed" layout issues
+        context_kwargs = {
+            "user_agent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            "locale": 'en-SG',
+            "timezone_id": 'Asia/Singapore',
+            "storage_state": storage_state
+        }
+        
+        if not self.headless:
+            # Let the browser window dictate the size to avoid layout shifts
+            context_kwargs["no_viewport"] = True
+        else:
+            # Fixed viewport for headless streaming
+            context_kwargs["viewport"] = {'width': 1920, 'height': 1080}
+            
+        self._context = await self._browser.new_context(**context_kwargs)
         
         self._page = await self._context.new_page()
+        
+        # Apply manual stealth scripts to hide automation
+        await self._apply_stealth(self._page)
+        
         self._launched = True
+    
+    async def _apply_stealth(self, page: Page):
+        """Apply stealth scripts to mask automation fingerprints."""
+        stealth_js = """
+        // Mask webdriver
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        
+        // Mask plugins
+        Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+        
+        // Mask languages
+        Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+        
+        // Mask chrome property
+        window.chrome = { runtime: {} };
+        
+        // Mask permissions
+        const originalQuery = window.navigator.permissions.query;
+        window.navigator.permissions.query = (parameters) => (
+            parameters.name === 'notifications' ?
+            Promise.resolve({ state: Notification.permission }) :
+            originalQuery(parameters)
+        );
+        """
+        await page.add_init_script(stealth_js)
+        print("BROWSER: 🛡️ Stealth mode applied")
+        
+        # Start streaming automatically if requested or as a standard feature
+        await self.start_streaming()
         
         print("BROWSER: ✓ Browser launched successfully")
         return self._browser, self._context, self._page
@@ -100,6 +145,103 @@ class BrowserLoader:
     def get_browser(self) -> Optional[Browser]:
         """Get the browser instance."""
         return self._browser
+
+    async def start_streaming(self):
+        """Start the background live-stream task."""
+        if self._stream_task is not None and not self._stream_task.done():
+            return
+
+        self._streaming = True
+        self._stream_task = asyncio.create_task(self._streaming_loop())
+        print("BROWSER: 📡 Live-stream bridge started (dashboard/public/live.jpg)")
+
+    async def stop_streaming(self):
+        """Stop the background live-stream task."""
+        self._streaming = False
+        if self._stream_task:
+            self._stream_task.cancel()
+            try:
+                await self._stream_task
+            except asyncio.CancelledError:
+                pass
+            self._stream_task = None
+        print("BROWSER: 📡 Live-stream bridge stopped")
+
+    async def _streaming_loop(self):
+        # Use absolute paths for Windows reliability
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        public_dir = os.path.join(base_dir, "dashboard", "public")
+        stream_path = os.path.join(public_dir, "live.jpg")
+        temp_path = os.path.join(public_dir, "live.tmp.jpg")
+        
+        # Ensure directory exists
+        os.makedirs(public_dir, exist_ok=True)
+        
+        print(f"BROWSER: 📡 Stream paths: {stream_path}")
+        
+        last_msg_check = 0
+        last_idle_refresh = 0
+        import random
+        
+        while self._streaming:
+            if self._page and not self._page.is_closed():
+                try:
+                    # Take screenshot to a temp file first to prevent UI flickering
+                    await self._page.screenshot(
+                        path=temp_path,
+                        type="jpeg",
+                        quality=45,
+                    )
+                    
+                    # Atomic move ensures the file is always "complete" when React reads it
+                    if os.path.exists(temp_path):
+                        try:
+                            if os.path.exists(stream_path):
+                                os.remove(stream_path)
+                            os.rename(temp_path, stream_path)
+                        except OSError:
+                            pass
+                        finally:
+                            if os.path.exists(temp_path):
+                                try: os.remove(temp_path)
+                                except: pass
+                except Exception as e:
+                    if "Target closed" not in str(e):
+                        print(f"BROWSER: ⚠️ Stream capture error: {e}")
+                
+                current_time = asyncio.get_event_loop().time()
+                current_url = self._page.url.rstrip('/')
+                is_home = current_url == "https://www.carousell.sg" or current_url == "https://carousell.sg"
+                
+                # Idle auto-refresh: Every 20-30 seconds when on homepage
+                if is_home and not self.pending_chat_action:
+                    if current_time - last_idle_refresh > 25 + random.randint(-5, 5):
+                        last_idle_refresh = current_time
+                        print("BROWSER: 🔄 Idle refresh...")
+                        try:
+                            await self._page.reload(wait_until="domcontentloaded")
+                            await asyncio.sleep(0.5)
+                            await self.handle_carousell_popups()
+                        except:
+                            pass
+                
+                # Message badge detection: Check every 5 seconds on homepage
+                if current_time - last_msg_check > 5.0:
+                    last_msg_check = current_time
+                    try:
+                        if is_home:
+                            badge = await self._page.query_selector('a[aria-label="Inbox"] div.D_azt')
+                            if badge and await badge.is_visible():
+                                print("BROWSER: 💬 Auto-detected new message! Navigating to Inbox...")
+                                await self._page.goto("https://www.carousell.sg/inbox/", wait_until="domcontentloaded")
+                                await asyncio.sleep(1)
+                                await self.handle_carousell_popups()
+                                self.pending_chat_action = True
+                    except:
+                        pass
+            
+            # Target ~3 FPS for smoother visualization
+            await asyncio.sleep(0.3)
     
     async def navigate(self, url: str, wait_until: str = "domcontentloaded") -> bool:
         """
@@ -145,8 +287,8 @@ class BrowserLoader:
             if "carousell.sg/search" in self._page.url:
                 await self.handle_carousell_tabs()
             
-            # Inject Agent HUD
-            await self.inject_agent_ui()
+            # Optional: Inject HUD (disabled to prevent flickering)
+            # await self.inject_agent_ui()
             
             return True
         except Exception as e:
@@ -299,6 +441,78 @@ class BrowserLoader:
             
         print("BROWSER: 🏁 Idle refresh period complete.")
 
+    async def parse_inbox_messages(self) -> list[dict]:
+        """
+        Parses the current /inbox/ page to find unread messages.
+        
+        Returns:
+            List of unread chat info: [{'seller': 'name', 'message': 'text', 'index': 0}]
+        """
+        if not self._page or "/inbox" not in self._page.url.lower():
+            return []
+
+        print("BROWSER: 📨 Parsing inbox for unread messages...")
+        
+        # Use JavaScript to parse the specific sibling structure mentioned by the user
+        unread_chats = await self._page.evaluate("""
+            () => {
+                const results = [];
+                // 1. Find the "Chats" header text
+                const paragraphs = document.querySelectorAll('p');
+                let chatsHeader = null;
+                for (let p of paragraphs) {
+                    if (p.innerText.trim() === 'Chats') {
+                        chatsHeader = p;
+                        break;
+                    }
+                }
+                
+                if (!chatsHeader) return [];
+
+                // 2. Find the container (usually a parent or grandparent) 
+                // In Carousell UI, the header is inside a div, and its sibling contains the chats
+                const headerContainer = chatsHeader.closest('div.D_Fv') || chatsHeader.parentElement;
+                const chatsContainer = headerContainer ? headerContainer.nextElementSibling : null;
+                
+                if (!chatsContainer) return [];
+
+                // 3. Look for all divs with role="button" inside the container
+                const chatItems = chatsContainer.querySelectorAll('div[role="button"]');
+                
+                chatItems.forEach((item, index) => {
+                    // Check for unread marker: <div class="D_axN"><span class="D_axO">1</span></div>
+                    const badge = item.querySelector('.D_axN, .D_axO');
+                    const isUnread = !!badge;
+                    
+                    if (isUnread) {
+                        const itemParagraphs = item.querySelectorAll('p');
+                        // First p is usually seller name, second is a name, third is the message snippet
+                        // alexigeorg33390 (Seller) -> alexi item (Product snippet title) -> message snippet
+                        // Based on HTML provided:
+                        // p[0]: alexigeorg33390 (Seller Name)
+                        // p[1]: Message text
+                        const sellerName = itemParagraphs[0]?.innerText || "Unknown";
+                        const latestMsg = itemParagraphs[1]?.innerText || "";
+                        
+                        results.push({
+                            index: index,
+                            seller: sellerName,
+                            message: latestMsg,
+                            unread: true
+                        });
+                    }
+                });
+                return results;
+            }
+        """)
+        
+        if unread_chats:
+            print(f"BROWSER: 🔔 Found {len(unread_chats)} unread chats!")
+        else:
+            print("BROWSER: No unread chats found.")
+            
+        return unread_chats
+
     async def check_for_new_messages(self, interval: int = 7, max_checks: int = 20) -> bool:
         """
         Stay on homepage, refresh periodically, and check for new message notifications.
@@ -319,25 +533,10 @@ class BrowserLoader:
             print("BROWSER: 🔄 Refreshing page...")
             await self._page.reload(wait_until="domcontentloaded")
             await self.handle_carousell_popups()
-            await self.inject_agent_ui()
             
             # Check for notification badge on the inbox icon
-            # With notification: <a aria-label="Inbox"><div class="D_azt"><span>1</span></div>...
-            # Without notification: <a aria-label="Inbox"><svg>...</svg></a> (no div/span)
             try:
-                # Look for the badge div inside the inbox link
                 badge = await self._page.query_selector('a[aria-label="Inbox"] div.D_azt span')
-                if badge and await badge.is_visible():
-                    text = await badge.inner_text()
-                    if text and text.strip().isdigit() and int(text.strip()) > 0:
-                        print(f"BROWSER: 💬 NEW MESSAGE DETECTED! Badge shows: {text}")
-                        return True
-            except:
-                pass
-            
-            # Fallback: check for any span inside inbox link
-            try:
-                badge = await self._page.query_selector('a[aria-label="Inbox"] span')
                 if badge and await badge.is_visible():
                     text = await badge.inner_text()
                     if text and text.strip().isdigit() and int(text.strip()) > 0:
@@ -351,6 +550,46 @@ class BrowserLoader:
         print("BROWSER: 🏁 Message check loop complete. No new messages found.")
         return False
     
+    async def click_inbox_chat(self, index: int) -> bool:
+        """
+        Clicks on a chat in the inbox list by its index (0 is topmost).
+        """
+        if not self._page or "/inbox" not in self._page.url.lower():
+            print("BROWSER: Error - Not on inbox page")
+            return False
+            
+        print(f"BROWSER: Clicking chat at index {index} in the list...")
+        try:
+            # Use JavaScript to find the exact container and click the role="button" at that index
+            await self._page.evaluate(f"""
+                (idx) => {{
+                    const paragraphs = document.querySelectorAll('p');
+                    let chatsHeader = null;
+                    for (let p of paragraphs) {{
+                        if (p.innerText.trim() === 'Chats') {{
+                            chatsHeader = p;
+                            break;
+                        }}
+                    }}
+                    if (!chatsHeader) return;
+                    const headerContainer = chatsHeader.closest('div.D_Fv') || chatsHeader.parentElement;
+                    const chatsContainer = headerContainer ? headerContainer.nextElementSibling : null;
+                    if (!chatsContainer) return;
+                    
+                    const chatItems = chatsContainer.querySelectorAll('div[role="button"]');
+                    if (chatItems[idx]) {{
+                        chatItems[idx].click();
+                        return true;
+                    }}
+                    return false;
+                }}
+            """, index)
+            await asyncio.sleep(2)
+            return True
+        except Exception as e:
+            print(f"BROWSER: Failed to click chat: {e}")
+            return False
+
     async def wait_for_selector(self, selector: str, timeout: int = 10000) -> bool:
         """
         Wait for a selector to appear on the page.

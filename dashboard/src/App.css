@@ -13,8 +13,9 @@ body {
 
 .app {
   width: 100%;
-  max-width: 100%;
-  padding: 20px 48px;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 10px 30px;
 }
 
 /* Header & Tabs */
@@ -59,40 +60,267 @@ body {
 .tab.active {
   background: #fff;
   color: #1d1d1f;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 /* Main */
 .main {
-  min-height: 500px;
+  min-height: 600px;
+  position: relative;
 }
 
-/* Browser Placeholder */
-.browser-placeholder {
+.tab-content.hidden {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+.layout-split {
+  display: flex;
+  gap: 24px;
+  height: 700px;
+  margin-top: 10px;
+}
+
+/* Chat Panel */
+.chat-panel {
+  flex: 0 0 320px;
+  /* Fixed width on the right */
+  background: #1e1e1e;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.chat-header {
+  padding: 12px 16px;
+  background: #252526;
+  border-bottom: 1px solid #333;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chat-header h3 {
+  color: #ccc;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  background: #4ade80;
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.5);
+}
+
+.chat-log {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.no-logs {
+  color: #666;
+  font-size: 0.8rem;
+  text-align: center;
+  margin-top: 20px;
+}
+
+.log-entry {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.log-time {
+  color: #666;
+  margin-right: 6px;
+}
+
+.log-sender {
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+.log-entry.system {
+  color: #3b82f6;
+}
+
+.log-entry.user {
+  color: #a855f7;
+}
+
+.log-entry.agent {
+  color: #eab308;
+}
+
+.log-entry.error {
+  color: #ef4444;
+}
+
+.chat-input {
+  padding: 12px;
+  background: #252526;
+  border-top: 1px solid #333;
+  display: flex;
+  gap: 8px;
+}
+
+.chat-input input {
+  flex: 1;
+  background: #333;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 8px 12px;
+  color: #fff;
+  font-size: 0.8rem;
+  outline: none;
+}
+
+.chat-input input:focus {
+  border-color: #3b82f6;
+}
+
+.chat-input button {
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 0 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chat-input button:hover {
+  background: #2563eb;
+}
+
+.chat-input button:disabled {
+  background: #666;
+  cursor: not-allowed;
+}
+
+/* Browser Container and Live Stream */
+.browser-container {
+  flex: 1;
+  /* Take 70% of space */
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.live-stream {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 16/9;
+  /* Keep the rectangle shape */
+  background: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stream-placeholder {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  height: 500px;
-  background: #fff;
-  border-radius: 12px;
-  border: 2px dashed #d2d2d7;
-  color: #86868b;
+  gap: 16px;
+  color: #555;
+  font-weight: 500;
 }
 
-.placeholder-icon {
-  font-size: 4rem;
-  margin-bottom: 16px;
+.pulse-slow {
+  width: 12px;
+  height: 12px;
+  background: #333;
+  border-radius: 50%;
+  animation: pulse-gray 3s infinite;
 }
 
-.browser-placeholder p {
-  font-size: 1.1rem;
-  color: #1d1d1f;
+@keyframes pulse-gray {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(100, 100, 100, 0.7);
+  }
+
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(100, 100, 100, 0);
+  }
+
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(100, 100, 100, 0);
+  }
 }
 
-.placeholder-hint {
-  font-size: 0.85rem;
-  margin-top: 8px;
+.live-frame {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: opacity 0.3s ease;
+}
+
+.stream-badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  z-index: 10;
+}
+
+.pulse {
+  width: 8px;
+  height: 8px;
+  background: #ff3b30;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.7);
+  animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.7);
+  }
+
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(255, 59, 48, 0);
+  }
+
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(255, 59, 48, 0);
+  }
 }
 
 /* Item List */
@@ -174,9 +402,17 @@ body {
   display: block;
 }
 
-.price-value.low { color: #059669; }
-.price-value.avg { color: #d97706; }
-.price-value.high { color: #dc2626; }
+.price-value.low {
+  color: #059669;
+}
+
+.price-value.avg {
+  color: #d97706;
+}
+
+.price-value.high {
+  color: #dc2626;
+}
 
 .price-label {
   font-size: 0.65rem;
@@ -386,8 +622,13 @@ body {
   text-transform: uppercase;
 }
 
-.chat-msg.lowballer .msg-role { color: #1e40af; }
-.chat-msg.seller .msg-role { color: #92400e; }
+.chat-msg.lowballer .msg-role {
+  color: #1e40af;
+}
+
+.chat-msg.seller .msg-role {
+  color: #92400e;
+}
 
 .msg-round {
   font-size: 0.65rem;
@@ -396,11 +637,30 @@ body {
   font-weight: 500;
 }
 
-.msg-round.round-1 { background: #fee2e2; color: #991b1b; }
-.msg-round.round-2 { background: #fef3c7; color: #92400e; }
-.msg-round.round-3 { background: #d1fae5; color: #065f46; }
-.msg-round.round-4 { background: #dbeafe; color: #1e40af; }
-.msg-round.round-5 { background: #ede9fe; color: #5b21b6; }
+.msg-round.round-1 {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.msg-round.round-2 {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.msg-round.round-3 {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.msg-round.round-4 {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.msg-round.round-5 {
+  background: #ede9fe;
+  color: #5b21b6;
+}
 
 .msg-time {
   font-size: 0.65rem;
