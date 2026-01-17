@@ -635,7 +635,13 @@ Be helpful, proactive, and explain what you're doing."""
         if max_price:
             self.current_listings = filter_listings_by_price(self.current_listings, max_price)
         
-        return f"Found {len(self.current_listings)} listings for '{query}'" + (f" under ${max_price}" if max_price else "")
+        # Auto-display listings
+        if self.current_listings:
+            display = format_listings_for_display(self.current_listings)
+            print(display)
+            return f"Found {len(self.current_listings)} listings for '{query}'" + (f" under ${max_price}" if max_price else "") + " (displayed above)"
+        else:
+            return f"No listings found for '{query}'" + (f" under ${max_price}" if max_price else "")
     
     async def _handle_extract(self) -> str:
         """Handle extract_listings tool."""
@@ -767,33 +773,56 @@ Be helpful, proactive, and explain what you're doing."""
         print(f"CONTROLLER: Opening chat (Current URL: {page.url})...")
         chat_opened = False
         
-        # Strategy 1: Explicit Role/Text logic (Most robust in Playwright)
+        # Wait a bit more for the page to fully render
+        await asyncio.sleep(2)
+        
+        # Strategy 1: Use Playwright's get_by_text for "View Chat" (the variant we see)
         try:
-            # Look for a button that has the text "Chat"
-            btn = page.get_by_role("button", name=re.compile(r"^Chat$", re.I))
-            if await btn.count() > 0 and await btn.first.is_visible():
-                await btn.first.click()
+            view_chat_btn = page.get_by_text("View Chat", exact=True)
+            if await view_chat_btn.count() > 0 and await view_chat_btn.first.is_visible():
+                await view_chat_btn.first.click()
                 chat_opened = True
-                print("CONTROLLER: ✓ Clicked 'Chat' button via role/text")
-        except Exception: pass
-
+                print("CONTROLLER: ✓ Clicked 'View Chat' button via get_by_text")
+        except Exception as e:
+            print(f"CONTROLLER: View Chat via get_by_text failed: {e}")
+        
+        # Strategy 2: Use locator with text
         if not chat_opened:
-            # Strategy 2: List of selectors
+            try:
+                btn = page.locator('button:has-text("View Chat")').first
+                if await btn.is_visible():
+                    await btn.click()
+                    chat_opened = True
+                    print("CONTROLLER: ✓ Clicked 'View Chat' button via locator")
+            except Exception:
+                pass
+        
+        # Strategy 3: Look for "Chat" button
+        if not chat_opened:
+            try:
+                btn = page.get_by_role("button", name=re.compile(r"Chat", re.I))
+                if await btn.count() > 0 and await btn.first.is_visible():
+                    await btn.first.click()
+                    chat_opened = True
+                    print("CONTROLLER: ✓ Clicked 'Chat' button via role")
+            except Exception:
+                pass
+
+        # Strategy 4: CSS selectors fallback
+        if not chat_opened:
             chat_selectors = [
+                'button:has-text("View Chat")',
+                'button:has-text("Chat")',
+                'text="View Chat"',
                 'text="Chat"',
                 '[data-testid="chat-button"]',
-                'button:has-text("Chat")',
                 'button:has-text("Chat with Seller")',
+                'a:has-text("View Chat")',
                 'a:has-text("Chat")',
-                'button:has-text("Buy Now")', 
-                '[class*="chat"]',
-                'button:has-text("Make Offer")',
-                'button:has-text("Direct Message")',
             ]
             
             for selector in chat_selectors:
                 try:
-                    # Use wait_for_selector via browser_loader
                     btn = await page.wait_for_selector(selector, timeout=2000)
                     if btn and await btn.is_visible():
                         await btn.click()

@@ -74,36 +74,14 @@ def parse_listings(dom_data: dict) -> list[dict]:
     soup = BeautifulSoup(html, 'html.parser')
     listings = []
     
-    # Carousell uses various container patterns for listings
-    # Try multiple selectors that Carousell might use
-    listing_containers = []
+    # Use the exact Carousell structure: data-testid="listing-card-XXXX"
+    listing_cards = soup.select('[data-testid^="listing-card-"]')
     
-    # Pattern 1: Modern Carousell card structure
-    listing_containers.extend(soup.select('[data-testid*="listing"]'))
+    print(f"DOM_PARSER: Found {len(listing_cards)} listing cards")
     
-    # Pattern 2: Class-based cards
-    listing_containers.extend(soup.select('div[class*="card"], div[class*="listing"], div[class*="product"]'))
-    
-    # Pattern 3: Link-based listings (common in search results)
-    listing_containers.extend(soup.select('a[href*="/p/"], a[href*="/listing/"]'))
-    
-    # Pattern 4: Generic article/item patterns
-    listing_containers.extend(soup.select('article, [role="listitem"]'))
-    
-    # Deduplicate by removing nested elements
-    seen_texts = set()
-    unique_containers = []
-    
-    for container in listing_containers:
-        text_content = container.get_text(strip=True)[:100]  # First 100 chars for dedup
-        if text_content and text_content not in seen_texts:
-            seen_texts.add(text_content)
-            unique_containers.append(container)
-    
-    print(f"DOM_PARSER: Found {len(unique_containers)} potential listing containers")
-    
-    for idx, container in enumerate(unique_containers[:20]):  # Limit to first 20
-        listing = extract_listing_info(container, idx)
+    # Extract info and index sequentially
+    for idx, card in enumerate(listing_cards[:20]):  # Limit to first 20
+        listing = extract_listing_info(card, idx)
         if listing and listing.get("price", 0) > 0:
             listings.append(listing)
     
@@ -113,85 +91,86 @@ def parse_listings(dom_data: dict) -> list[dict]:
 
 def extract_listing_info(container, index: int) -> Optional[dict]:
     """
-    Extract listing information from a container element.
+    Extract listing information from a Carousell listing card.
     
     Args:
-        container: BeautifulSoup element containing listing
+        container: BeautifulSoup element (listing card with data-testid)
         index: Index number for this listing
         
     Returns:
         Dictionary with listing info or None
     """
     try:
-        # Extract title - try various patterns
-        title_elem = (
-            container.select_one('[data-testid*="title"], h2, h3, [class*="title"]') or
-            container.select_one('p, span')
-        )
-        title = title_elem.get_text(strip=True) if title_elem else ""
+        # Get the product link (contains title and goes to /p/)
+        product_link = container.select_one('a[href*="/p/"]')
+        if not product_link:
+            return None
         
-        # Extract price - look for currency patterns
+        # Extract title from img alt or p element inside product link
+        title = ""
+        img_elem = product_link.select_one('img[alt]')
+        if img_elem:
+            title = img_elem.get('alt', '')
+        if not title:
+            # Fallback: get first p with --max-line style (title element)
+            title_p = product_link.select_one('p[style*="--max-line"]')
+            if title_p:
+                title = title_p.get_text(strip=True)
+        
+        # Extract price from p element with title attribute containing S$
         price_text = ""
-        # Try specific attribute first
-        price_elem = container.select_one('[data-testid*="price"], [class*="price"]')
+        price_elem = product_link.select_one('p[title*="S$"]')
         if price_elem:
-            price_text = price_elem.get_text(strip=True)
-        
-        # If still empty or no number found, try regex on full container text
-        if not price_text or not re.search(r'\d', price_text):
-            full_text = container.get_text(" ", strip=True)
-            # Regex to find: S$123, $123, 123.45 (with or without From)
-            price_match = re.search(r'(?:S?\$|From\s+S?\$)\s*([\d,]+(?:\.\d{2})?)', full_text, re.IGNORECASE)
-            if price_match:
-                price_text = price_match.group(0)
-            else:
-                # Last resort: just find any number with a $ nearby
-                price_match = re.search(r'[\d,]+(?:\.\d{2})?', full_text)
-                if price_match:
-                    price_text = price_match.group(0)
+            price_text = price_elem.get('title', '') or price_elem.get_text(strip=True)
+        else:
+            # Fallback: look for S$ in any p element
+            for p in product_link.select('p'):
+                text = p.get_text(strip=True)
+                if text.startswith('S$'):
+                    price_text = text
+                    break
         
         price = parse_price(price_text)
         
-        # Extract seller info
-        seller_elem = container.select_one('[class*="seller"], [class*="user"], [class*="owner"]')
+        # Extract seller name from data-testid="listing-card-text-seller-name"
+        seller_elem = container.select_one('[data-testid="listing-card-text-seller-name"]')
         seller_name = seller_elem.get_text(strip=True) if seller_elem else "Unknown Seller"
         
-        # Extract URLs
-        # Prioritize item links over seller/profile links
-        item_link = container.select_one('a[href*="/p/"], a[href*="/listing/"]')
-        if not item_link and container.name == 'a' and ('/p/' in container.get('href', '') or '/listing/' in container.get('href', '')):
-            item_link = container
-            
-        link_elem = item_link or container.select_one('a[href]') or (container if container.name == 'a' else None)
+        # Get the product URL
+        href = product_link.get('href', '')
+        listing_url = f"https://www.carousell.sg{href}" if href.startswith('/') else href
         
-        listing_url = ""
-        if link_elem and link_elem.get('href'):
-            href = link_elem.get('href', '')
-            listing_url = f"https://www.carousell.sg{href}" if href.startswith('/') else href
-        
-        # Extract image
-        img_elem = container.select_one('img[src]')
+        # Extract image URL
         image_url = img_elem.get('src', '') if img_elem else ""
         
-        # Generate CSS selector for chat button
-        # Carousell chat buttons are usually on listing detail pages
-        chat_selector = f'[data-testid="chat-button"], button:has-text("Chat"), a:has-text("Chat")'
+        # Extract condition if present
+        condition = ""
+        # Look for "Brand new", "Like new", etc.
+        for p in container.select('p'):
+            text = p.get_text(strip=True).lower()
+            if text in ['brand new', 'like new', 'well used', 'heavily used']:
+                condition = p.get_text(strip=True)
+                break
         
         # Skip if no meaningful title or price
-        if not title or len(title) < 3:
+        if not title or len(title) < 2:
+            return None
+        
+        # Require valid S$ price
+        if price <= 0:
             return None
             
         return {
             "index": index,
-            "title": title[:100],  # Truncate long titles
+            "title": title[:100],
             "price": price,
             "price_raw": price_text,
             "seller_name": seller_name,
             "seller_url": "",
             "listing_url": listing_url,
-            "chat_selector": chat_selector,
+            "chat_selector": '[data-testid="chat-button"], button:has-text("Chat")',
             "image_url": image_url,
-            "condition": "",
+            "condition": condition,
             "location": "",
         }
         

@@ -106,7 +106,7 @@ class LLMClient:
                 "raw_response": response,
             }
             
-            # Parse tool calls if present
+            # Parse tool calls if present (standard format)
             if hasattr(message, 'tool_calls') and message.tool_calls:
                 for tc in message.tool_calls:
                     result["tool_calls"].append({
@@ -114,6 +114,25 @@ class LLMClient:
                         "name": tc.function.name,
                         "arguments": json.loads(tc.function.arguments),
                     })
+            
+            # Fallback: some models return tool calls as JSON in the content field
+            if not result["tool_calls"] and result["content"]:
+                content = result["content"].strip()
+                # Try to parse JSON from content
+                if content.startswith("{") and "function" in content:
+                    try:
+                        parsed = json.loads(content)
+                        # Format: {"function": {"name": "...", "arguments": {...}}}
+                        if "function" in parsed:
+                            func = parsed["function"]
+                            result["tool_calls"].append({
+                                "id": "fallback_1",
+                                "name": func.get("name", ""),
+                                "arguments": func.get("arguments", {}),
+                            })
+                            result["content"] = ""  # Clear content since we parsed it
+                    except json.JSONDecodeError:
+                        pass
             
             print(f"LLM_FACTORY: ✓ Generated {len(result['content'])} chars")
             if result["tool_calls"]:

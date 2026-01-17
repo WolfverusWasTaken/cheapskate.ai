@@ -375,7 +375,7 @@ Write ONLY the message itself, nothing else. Keep it to 1-2 sentences max."""
     
     async def _send_message(self, page: Any, message: str) -> bool:
         """
-        Type and send a message in the chat window.
+        Type and send a message in the Carousell chat.
         
         Args:
             page: Playwright page object
@@ -389,66 +389,55 @@ Write ONLY the message itself, nothing else. Keep it to 1-2 sentences max."""
             
         print(f"LOWBALLER: Waiting for chat input on {page.url}...")
         
-        # Wait for the chat page/container to exist
+        # Wait for page to settle
+        await asyncio.sleep(2)
+        
+        # Use the exact Carousell chat textarea selector
         try:
-            await asyncio.sleep(2) # Base wait for animation
-            await page.wait_for_selector('[class*="chat"], [class*="Conversation"]', timeout=5000)
-        except:
-            print("LOWBALLER: Warning - Chat container not found, proceeding with input search...")
-        
-        # Common chat input selectors for Carousell
-        input_selectors = [
-            'textarea[placeholder*="message"]',
-            'textarea[placeholder*="Type"]',
-            'input[placeholder*="message"]',
-            '[data-testid="chat-input"]',
-            '[data-testid="chat-input-textarea"]',
-            'textarea[class*="chat"]',
-            'input[class*="chat"]',
-            '[contenteditable="true"]',
-            'textarea',
-        ]
-        
-        for selector in input_selectors:
-            try:
-                # Wait briefly for element
-                el = await page.wait_for_selector(selector, timeout=3000)
-                if not el or not await el.is_visible():
+            text_box = page.locator('textarea[placeholder="Type here..."]')
+            
+            # Wait for it to be visible
+            await text_box.wait_for(state="visible", timeout=10000)
+            
+            # Fill with the message
+            await text_box.fill(message)
+            print(f"LOWBALLER: ✓ Typed message into chat input")
+            
+            # Small delay before sending
+            await asyncio.sleep(0.5)
+            
+            # Press Enter to send
+            await text_box.press("Enter")
+            print(f"LOWBALLER: ✓ Message sent (Enter key)")
+            
+            # Wait a moment for the message to be sent
+            await asyncio.sleep(1)
+            return True
+            
+        except Exception as e:
+            print(f"LOWBALLER: ✗ Failed to send message: {e}")
+            
+            # Fallback: Try alternative selectors
+            fallback_selectors = [
+                'textarea[placeholder*="Type"]',
+                'textarea[placeholder*="message"]',
+                '[contenteditable="true"]',
+                'textarea',
+            ]
+            
+            for selector in fallback_selectors:
+                try:
+                    el = page.locator(selector).first
+                    if await el.is_visible():
+                        await el.fill(message)
+                        await el.press("Enter")
+                        print(f"LOWBALLER: ✓ Message sent via fallback ({selector})")
+                        return True
+                except:
                     continue
-                
-                # Type the message
-                await page.fill(selector, message)
-                
-                # Try to find and click send button
-                send_selectors = [
-                    'button[type="submit"]',
-                    'button:has-text("Send")',
-                    '[data-testid="send-button"]',
-                    '[aria-label="Send"]',
-                    'button[class*="send"]',
-                ]
-                
-                for send_sel in send_selectors:
-                    try:
-                        btn = await page.query_selector(send_sel)
-                        if btn and await btn.is_visible():
-                            await btn.click()
-                            print(f"LOWBALLER: ✓ Message sent via button ({send_sel})")
-                            return True
-                    except Exception:
-                        continue
-                
-                # If no send button, try pressing Enter
-                await page.press(selector, "Enter")
-                print(f"LOWBALLER: ✓ Message sent (Enter key)")
-                return True
-                
-            except Exception:
-                continue
-        
-        print("LOWBALLER: ✗ Could not find chat input field")
-        await page.screenshot(path="screenshots/chat_input_not_found.png")
-        return False
+            
+            await page.screenshot(path="screenshots/chat_input_not_found.png")
+            return False
     
     async def extract_seller_reply(self, page: Any) -> Optional[str]:
         """
