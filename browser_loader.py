@@ -68,7 +68,7 @@ class BrowserLoader:
             print(f"BROWSER: Loading session from {auth_path}")
             
         self._context = await self._browser.new_context(
-            viewport={'width': 1280, 'height': 800},
+            viewport={'width': 1920, 'height': 1080},  # Full HD 16:9 aspect ratio
             user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             locale='en-SG',
             timezone_id='Asia/Singapore',
@@ -156,6 +156,7 @@ class BrowserLoader:
     async def handle_carousell_popups(self):
         """Aggressive popup dismissal: Wait for popup, find X, click immediately."""
         try:
+<<<<<<< Updated upstream
             # Wait a moment for popup to appear
             await asyncio.sleep(0.3)
             
@@ -209,9 +210,19 @@ class BrowserLoader:
                 'button:has-text("×")',
                 'button:has-text("✕")',
                 'button[aria-label="Close"]',
+=======
+            # Common Carousell popup elements
+            popup_selectors = [
+                'button:has-text("Okay")',            # Cart tooltip dismissal
+                'button:has-text("Next")',
+                'button:has-text("Got it")',
+                'button:has-text("Close")',
+                'text="Okay"',                        # Cart tooltip dismissal
+>>>>>>> Stashed changes
                 'svg[aria-label="Close"]',
             ]
             
+<<<<<<< Updated upstream
             for selector in x_selectors:
                 try:
                     btn = await self._page.query_selector(selector)
@@ -222,6 +233,28 @@ class BrowserLoader:
                 except:
                     continue
                     
+=======
+            # Try to clear up to 3 layers of popups (onboarding often has multiple steps)
+            for i in range(3):
+                found_popup = False
+                for selector in popup_selectors:
+                    try:
+                        # Use a very short timeout for popup checks
+                        btn = await self._page.query_selector(selector)
+                        if btn and await btn.is_visible():
+                            # Confirm it's not a button we actually want (like 'Search')
+                            text = await btn.inner_text()
+                            if text.lower() in ["next", "got it", "close", "okay", ""] or not text:
+                                print(f"BROWSER: 🖱️ Clicking popup button: '{text}' ({selector})")
+                                await btn.click()
+                                await asyncio.sleep(1)
+                                found_popup = True
+                                break 
+                    except:
+                        continue
+                if not found_popup:
+                    break
+>>>>>>> Stashed changes
         except Exception as e:
             print(f"BROWSER: ⚠️ Popup handling error: {e}")
 
@@ -234,6 +267,7 @@ class BrowserLoader:
             # Short wait for any dynamic tab loaders
             await asyncio.sleep(1.5)
             
+<<<<<<< Updated upstream
             # Check popup again before interacting (popups can appear late)
             await self.handle_carousell_popups()
             
@@ -246,20 +280,47 @@ class BrowserLoader:
                 'div[role="tab"]:has-text("All")',
                 'a:has-text("All")'
             ]
+=======
+            # Look for "All" tab in the filter bar area only
+            # Be VERY specific to avoid clicking random elements
+            # The tab bar on Carousell is typically at the top, with tabs like "All", "Certified"
+>>>>>>> Stashed changes
             
-            for selector in all_tab_selectors:
-                try:
-                    # Check if the element exists and is visible
-                    tab = await self._page.query_selector(selector)
-                    if tab and await tab.is_visible():
-                        # We need to make sure we aren't already on "All"
-                        # Usually, if "All" is clickable, we click it.
-                        print(f"BROWSER: 🔍 Found 'All' tab, switching to view all listings...")
-                        await tab.click()
-                        await asyncio.sleep(2) # Wait for content to refresh
-                        return True
-                except:
-                    continue
+            # First, check if we're on a page that has the "Certified" tab (which means "All" tab exists)
+            certified_tab = await self._page.query_selector('text="Certified"')
+            if not certified_tab:
+                # No Certified tab means we don't need to switch
+                return False
+            
+            # Now look for the "All" tab specifically using Playwright's get_by_role
+            try:
+                # Look for a tab element with exact text "All"
+                all_tab = self._page.get_by_role("tab", name="All")
+                if await all_tab.count() > 0 and await all_tab.first.is_visible():
+                    print(f"BROWSER: 🔍 Found 'All' tab, switching to view all listings...")
+                    await all_tab.first.click()
+                    await asyncio.sleep(2)
+                    return True
+            except:
+                pass
+            
+            # Fallback: look for exact text match in the tab bar area
+            try:
+                # Look for elements that have EXACTLY "All" as their text (not containing "All")
+                all_elements = await self._page.query_selector_all('p, span, button, a')
+                for elem in all_elements:
+                    text = await elem.inner_text()
+                    if text.strip() == "All":
+                        # Check if it's in the upper part of the page (tab bar area)
+                        box = await elem.bounding_box()
+                        if box and box['y'] < 200:  # Tab bar is typically in top 200px
+                            print(f"BROWSER: 🔍 Found 'All' tab (fallback), switching...")
+                            await elem.click()
+                            await asyncio.sleep(2)
+                            return True
+            except:
+                pass
+                
         except Exception as e:
             print(f"BROWSER: Error handling Carousell tabs: {e}")
         return False
@@ -303,26 +364,30 @@ class BrowserLoader:
             await self.handle_carousell_popups()
             await self.inject_agent_ui()
             
-            # Check for notification badge on the chat icon
-            # The Carousell nav has an inbox icon with a badge like <span class="D_azu D_azt">1</span>
-            badge_selectors = [
-                'a[href="/inbox/"] .D_azu',        # Badge class from DOM
-                'a[href="/inbox/"] .D_azt',        # Another potential badge class
-                'a[aria-label="Inbox"] span[class*="azu"]',
-                'a[aria-label="Inbox"] span[class*="azt"]',
-                '[href="/inbox/"] span',           # Any span inside inbox link
-            ]
+            # Check for notification badge on the inbox icon
+            # With notification: <a aria-label="Inbox"><div class="D_azt"><span>1</span></div>...
+            # Without notification: <a aria-label="Inbox"><svg>...</svg></a> (no div/span)
+            try:
+                # Look for the badge div inside the inbox link
+                badge = await self._page.query_selector('a[aria-label="Inbox"] div.D_azt span')
+                if badge and await badge.is_visible():
+                    text = await badge.inner_text()
+                    if text and text.strip().isdigit() and int(text.strip()) > 0:
+                        print(f"BROWSER: 💬 NEW MESSAGE DETECTED! Badge shows: {text}")
+                        return True
+            except:
+                pass
             
-            for selector in badge_selectors:
-                try:
-                    badge = await self._page.query_selector(selector)
-                    if badge and await badge.is_visible():
-                        text = await badge.inner_text()
-                        if text and text.strip().isdigit() and int(text.strip()) > 0:
-                            print(f"BROWSER: 💬 NEW MESSAGE DETECTED! Badge shows: {text}")
-                            return True
-                except:
-                    continue
+            # Fallback: check for any span inside inbox link
+            try:
+                badge = await self._page.query_selector('a[aria-label="Inbox"] span')
+                if badge and await badge.is_visible():
+                    text = await badge.inner_text()
+                    if text and text.strip().isdigit() and int(text.strip()) > 0:
+                        print(f"BROWSER: 💬 NEW MESSAGE DETECTED! Badge shows: {text}")
+                        return True
+            except:
+                pass
             
             print("BROWSER: No new messages yet...")
         
