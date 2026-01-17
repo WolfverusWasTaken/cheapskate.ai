@@ -1,0 +1,32 @@
+# Ignore Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment
+.env
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Playwright
+playwright-report/
+test-results/
+
+# Generated files
+screenshots/
+chat_history.json
+*.png
+*.jpg
+
+# OS
+.DS_Store
+Thumbs.db
