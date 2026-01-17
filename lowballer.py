@@ -246,7 +246,7 @@ class LowballerAgent:
         if initial_message:
             message = initial_message
         else:
-            message = await self._generate_message(item_name, listing_price, offer_price, current_round)
+            message = await self._generate_message(item_name, listing_price, offer_price, current_round, listing_data)
         
         print(f"LOWBALLER: Round {current_round} - Offering ${offer_price} ({offer_percent}% of ${listing_price})")
         print(f"LOWBALLER: Message → \"{message}\"")
@@ -277,6 +277,7 @@ class LowballerAgent:
         listing_price: float,
         offer_price: float,
         round_num: int,
+        listing_data: dict = {},
     ) -> str:
         """
         Generate a negotiation message using the LLM.
@@ -303,6 +304,8 @@ Item: {item_name}
 Listed Price: S${listing_price}
 Your Offer: S${offer_price}
 Round: {round_num}
+Description: {listing_data.get('description', 'N/A')}
+Details: {json.dumps(listing_data.get('structured_details', {}), indent=2)}
 
 TACTICAL GUIDANCE:
 {context}
@@ -383,21 +386,35 @@ Write ONLY the message itself, nothing else. Keep it to 1-2 sentences max."""
         """
         if page is None:
             return False
+            
+        print(f"LOWBALLER: Waiting for chat input on {page.url}...")
+        
+        # Wait for the chat page/container to exist
+        try:
+            await asyncio.sleep(2) # Base wait for animation
+            await page.wait_for_selector('[class*="chat"], [class*="Conversation"]', timeout=5000)
+        except:
+            print("LOWBALLER: Warning - Chat container not found, proceeding with input search...")
         
         # Common chat input selectors for Carousell
         input_selectors = [
             'textarea[placeholder*="message"]',
+            'textarea[placeholder*="Type"]',
             'input[placeholder*="message"]',
             '[data-testid="chat-input"]',
+            '[data-testid="chat-input-textarea"]',
             'textarea[class*="chat"]',
             'input[class*="chat"]',
+            '[contenteditable="true"]',
             'textarea',
         ]
         
         for selector in input_selectors:
             try:
                 # Wait briefly for element
-                await page.wait_for_selector(selector, timeout=2000)
+                el = await page.wait_for_selector(selector, timeout=3000)
+                if not el or not await el.is_visible():
+                    continue
                 
                 # Type the message
                 await page.fill(selector, message)
@@ -407,14 +424,17 @@ Write ONLY the message itself, nothing else. Keep it to 1-2 sentences max."""
                     'button[type="submit"]',
                     'button:has-text("Send")',
                     '[data-testid="send-button"]',
+                    '[aria-label="Send"]',
                     'button[class*="send"]',
                 ]
                 
                 for send_sel in send_selectors:
                     try:
-                        await page.click(send_sel, timeout=1000)
-                        print(f"LOWBALLER: ✓ Message sent via {selector}")
-                        return True
+                        btn = await page.query_selector(send_sel)
+                        if btn and await btn.is_visible():
+                            await btn.click()
+                            print(f"LOWBALLER: ✓ Message sent via button ({send_sel})")
+                            return True
                     except Exception:
                         continue
                 
@@ -427,6 +447,7 @@ Write ONLY the message itself, nothing else. Keep it to 1-2 sentences max."""
                 continue
         
         print("LOWBALLER: ✗ Could not find chat input field")
+        await page.screenshot(path="screenshots/chat_input_not_found.png")
         return False
     
     async def extract_seller_reply(self, page: Any) -> Optional[str]:

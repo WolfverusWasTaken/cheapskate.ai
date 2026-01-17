@@ -157,7 +157,13 @@ def extract_listing_info(container, index: int) -> Optional[dict]:
         seller_name = seller_elem.get_text(strip=True) if seller_elem else "Unknown Seller"
         
         # Extract URLs
-        link_elem = container.select_one('a[href]') or container if container.name == 'a' else None
+        # Prioritize item links over seller/profile links
+        item_link = container.select_one('a[href*="/p/"], a[href*="/listing/"]')
+        if not item_link and container.name == 'a' and ('/p/' in container.get('href', '') or '/listing/' in container.get('href', '')):
+            item_link = container
+            
+        link_elem = item_link or container.select_one('a[href]') or (container if container.name == 'a' else None)
+        
         listing_url = ""
         if link_elem and link_elem.get('href'):
             href = link_elem.get('href', '')
@@ -192,6 +198,63 @@ def extract_listing_info(container, index: int) -> Optional[dict]:
     except Exception as e:
         print(f"DOM_PARSER: Warning - Failed to parse container {index}: {e}")
         return None
+
+
+def extract_listing_details(html: str) -> dict:
+    """
+    Extract detailed information from a single listing page (description, details, etc.).
+    """
+    soup = BeautifulSoup(html, 'html.parser')
+    details = {}
+    
+    # 1. Extract Description
+    # We use find() with text instead of invalid CSS :has-text
+    desc_header = soup.find(['h2', 'h3', 'p'], string=re.compile(r'Description', re.I))
+    desc_elem = soup.select_one('[data-testid*="description"], [class*="description"]')
+    
+    if not desc_elem and desc_header:
+        # Try to find the next sibling div/p
+        desc_elem = desc_header.find_next(['div', 'p', 'span'])
+        
+    if desc_elem:
+        details["description"] = desc_elem.get_text("\n", strip=True)
+    else:
+        details["description"] = "No description found."
+
+    # 2. Extract structured "Details" section (Condition, Battery Health, etc.)
+    # Look for the section after "Details" header
+    details_header = soup.find(['h2', 'h3', 'p'], string=re.compile(r'Details', re.I))
+    if details_header:
+        # Find the container - Carousell usually uses a grid or list after the header
+        container = details_header.find_parent().find_parent() or details_header.parent
+        
+        # Look for pairs of text. Carousell often uses: 
+        # Label (Condition)
+        # Value (Lightly used)
+        
+        # Find all <div> or <span> elements that look like pairs
+        all_text_elements = container.find_all(['p', 'span', 'div'], recursive=True)
+        
+        extracted_pairs = {}
+        # Simple heuristic: filter for common labels
+        labels = ["Condition", "Battery Health", "Screen", "Body", "Warranty", "Model", "Storage", "Color", "Set"]
+        
+        for i, elem in enumerate(all_text_elements):
+            text = elem.get_text(strip=True)
+            for label in labels:
+                if label in text and len(text) < 30: # Likely a label
+                    # The next element or its child is likely the value
+                    if i + 1 < len(all_text_elements):
+                        val = all_text_elements[i+1].get_text(strip=True)
+                        if val and val != text:
+                            extracted_pairs[text] = val
+        
+        if extracted_pairs:
+            details["structured_details"] = extracted_pairs
+            # Also flatten some into the main dict for backward compatibility
+            details["condition"] = extracted_pairs.get("Condition", "")
+            
+    return details
 
 
 def filter_listings_by_price(listings: list[dict], max_price: float) -> list[dict]:

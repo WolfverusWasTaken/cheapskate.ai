@@ -16,7 +16,7 @@ from datetime import datetime
 
 from browser_loader import BrowserLoader
 from dom_extractor import extract_dom
-from dom_parser import parse_listings, filter_listings_by_price, format_listings_for_display
+from dom_parser import parse_listings, filter_listings_by_price, format_listings_for_display, extract_listing_details
 from llm_factory import LLMClient, LLMFactory
 from config import config
 
@@ -359,7 +359,7 @@ Be helpful, proactive, and explain what you're doing."""
         return f"Could not find chat button for listing {listing_index}. You may need to login first."
     
     async def _handle_delegate_lowball(self, listing_index: int) -> str:
-        """Handle delegate_lowball tool."""
+        """Handle delegate_lowball tool with full navigation flow."""
         if not self.current_listings:
             return "No listings available. Search first."
         
@@ -372,12 +372,84 @@ Be helpful, proactive, and explain what you're doing."""
         if not page:
             return "Browser not ready"
         
+        # Step 1: Navigate to listing page to get details
+        url = listing.get("listing_url")
+        print(f"CONTROLLER: Navigating to listing: {listing['title']} (URL: {url})")
+        if url:
+            success = await self.browser.navigate(url)
+            if not success:
+                return f"Failed to navigate to listing URL: {url}"
+            
+            # Wait for the page to actually be a listing page (containing /p/)
+            try:
+                await page.wait_for_url(lambda u: "/p/" in u or "/listing/" in u, timeout=5000)
+            except:
+                print(f"CONTROLLER: Warning - Navigation timed out or URL doesn't look like a listing: {page.url}")
+            
+            await asyncio.sleep(2)
+            
+            # Step 2: Extract description and enriched details
+            print("CONTROLLER: Reading listing description...")
+            html = await page.content()
+            details = extract_listing_details(html)
+            listing.update(details)
+            print(f"CONTROLLER: ✓ Description extracted ({len(listing.get('description', ''))} chars)")
+        
+        # Step 3: Open the chat
+        print(f"CONTROLLER: Opening chat (Current URL: {page.url})...")
+        chat_opened = False
+        
+        # Strategy 1: Explicit Role/Text logic (Most robust in Playwright)
+        try:
+            # Look for a button that has the text "Chat"
+            btn = page.get_by_role("button", name=re.compile(r"^Chat$", re.I))
+            if await btn.count() > 0 and await btn.first.is_visible():
+                await btn.first.click()
+                chat_opened = True
+                print("CONTROLLER: ✓ Clicked 'Chat' button via role/text")
+        except Exception: pass
+
+        if not chat_opened:
+            # Strategy 2: List of selectors
+            chat_selectors = [
+                'text="Chat"',
+                '[data-testid="chat-button"]',
+                'button:has-text("Chat")',
+                'button:has-text("Chat with Seller")',
+                'a:has-text("Chat")',
+                'button:has-text("Buy Now")', 
+                '[class*="chat"]',
+                'button:has-text("Make Offer")',
+                'button:has-text("Direct Message")',
+            ]
+            
+            for selector in chat_selectors:
+                try:
+                    # Use wait_for_selector via browser_loader
+                    btn = await page.wait_for_selector(selector, timeout=2000)
+                    if btn and await btn.is_visible():
+                        await btn.click()
+                        chat_opened = True
+                        print(f"CONTROLLER: ✓ Clicked chat button via selector ({selector})")
+                        break
+                except Exception:
+                    continue
+        
+        if not chat_opened:
+             # Take screenshot to see what went wrong
+             await self.browser.screenshot("screenshots/chat_open_failed.png")
+             return f"Could not find chat button on listing page. Please check the screenshot."
+
+        # Wait for chat page to load
+        await asyncio.sleep(4) 
+
         # Lazy-load lowballer
         if self.lowballer is None:
             from lowballer import LowballerAgent
             self.lowballer = LowballerAgent(self.llm)
         
-        # Delegate to lowballer
+        # Step 4: Delegate to lowballer
+        print("CONTROLLER: Handing over to Lowballer Agent...")
         result = await self.lowballer.negotiate(
             listing_data=listing,
             page=page,

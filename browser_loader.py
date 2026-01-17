@@ -118,8 +118,24 @@ class BrowserLoader:
             
         try:
             print(f"BROWSER: Navigating to {url}...")
+            target_url = url
             await self._page.goto(url, wait_until=wait_until, timeout=30000)
+            
+            # Handle popups and potential redirects
+            await self.handle_carousell_popups()
+            
+            # If redirected away from search (e.g. to a landing page), go back
+            if "carousell.sg/search" in target_url and "carousell.sg/search" not in self._page.url:
+                print(f"BROWSER: 🔄 Detected redirect away from search! Going back...")
+                await self._page.go_back()
+                await asyncio.sleep(2)
+                await self.handle_carousell_popups()
+            
             print(f"BROWSER: ✓ Navigation complete → {self._page.url}")
+            
+            # Special handling for Carousell search pages: switch to "All" tab if on "Certified"
+            if "carousell.sg/search" in self._page.url:
+                await self.handle_carousell_tabs()
             
             # Inject Agent HUD
             await self.inject_agent_ui()
@@ -128,6 +144,77 @@ class BrowserLoader:
         except Exception as e:
             print(f"BROWSER: ✗ Navigation failed → {e}")
             return False
+
+    async def handle_carousell_popups(self):
+        """Detect and close annoying Carousell popups/overlays."""
+        print("BROWSER: 🧹 Checking for intrusive popups...")
+        try:
+            # Common Carousell popup elements
+            popup_selectors = [
+                'button:has-text("Next")',
+                'button:has-text("Got it")',
+                'button:has-text("Close")',
+                'svg[aria-label="Close"]',
+                '[data-testid="onboarding-close"]',
+                '.D_azf', # Possible close button class from DOM history
+                'div[role="dialog"] button'
+            ]
+            
+            # Try to clear up to 3 layers of popups (onboarding often has multiple steps)
+            for i in range(3):
+                found_popup = False
+                for selector in popup_selectors:
+                    try:
+                        # Use a very short timeout for popup checks
+                        btn = await self._page.query_selector(selector)
+                        if btn and await btn.is_visible():
+                            # Confirm it's not a button we actually want (like 'Search')
+                            text = await btn.inner_text()
+                            if text.lower() in ["next", "got it", "close", ""] or not text:
+                                print(f"BROWSER: 🖱️ Clicking popup button: '{text}' ({selector})")
+                                await btn.click()
+                                await asyncio.sleep(1)
+                                found_popup = True
+                                break 
+                    except:
+                        continue
+                if not found_popup:
+                    break
+        except Exception as e:
+            print(f"BROWSER: Debug - Popup handling skipped: {e}")
+
+    async def handle_carousell_tabs(self):
+        """Detect and click the 'All' tab on search pages to bypass 'Certified' filter."""
+        try:
+            # Short wait for any dynamic tab loaders
+            await asyncio.sleep(1.5)
+            
+            # Look for "All" tab. Carousell often defaults to "Certified" for high-intent searches.
+            # We want to see EVERYTHING.
+            all_tab_selectors = [
+                'p:has-text("All")',
+                'span:has-text("All")',
+                'button:has-text("All")',
+                'div[role="tab"]:has-text("All")',
+                'a:has-text("All")'
+            ]
+            
+            for selector in all_tab_selectors:
+                try:
+                    # Check if the element exists and is visible
+                    tab = await self._page.query_selector(selector)
+                    if tab and await tab.is_visible():
+                        # We need to make sure we aren't already on "All"
+                        # Usually, if "All" is clickable, we click it.
+                        print(f"BROWSER: 🔍 Found 'All' tab, switching to view all listings...")
+                        await tab.click()
+                        await asyncio.sleep(2) # Wait for content to refresh
+                        return True
+                except:
+                    continue
+        except Exception as e:
+            print(f"BROWSER: Error handling Carousell tabs: {e}")
+        return False
     
     async def wait_for_selector(self, selector: str, timeout: int = 10000) -> bool:
         """
