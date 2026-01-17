@@ -218,6 +218,9 @@ class BrowserLoader:
                 'button:has-text("Got it")',
                 'button:has-text("Close")',
                 'text="Okay"',                        # Cart tooltip dismissal
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
                 'svg[aria-label="Close"]',
             ]
@@ -268,6 +271,7 @@ class BrowserLoader:
             await asyncio.sleep(1.5)
             
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
             # Check popup again before interacting (popups can appear late)
             await self.handle_carousell_popups()
             
@@ -280,6 +284,11 @@ class BrowserLoader:
                 'div[role="tab"]:has-text("All")',
                 'a:has-text("All")'
             ]
+=======
+            # Look for "All" tab in the filter bar area only
+            # Be VERY specific to avoid clicking random elements
+            # The tab bar on Carousell is typically at the top, with tabs like "All", "Certified"
+>>>>>>> Stashed changes
 =======
             # Look for "All" tab in the filter bar area only
             # Be VERY specific to avoid clicking random elements
