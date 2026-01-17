@@ -215,6 +215,71 @@ class BrowserLoader:
         except Exception as e:
             print(f"BROWSER: Error handling Carousell tabs: {e}")
         return False
+
+    async def idle_refresh(self, interval: int = 7, max_refreshes: int = 10):
+        """Go home and refresh periodically to stay idle but active."""
+        print(f"BROWSER: 🏠 Going home and starting idle refresh (interval: {interval}s)...")
+        await self.navigate("https://www.carousell.sg")
+        
+        for i in range(max_refreshes):
+            wait_time = interval + (i % 3) # Slight variation (5-10s range)
+            print(f"BROWSER: 😴 Sleeping for {wait_time}s... (Refresh {i+1}/{max_refreshes})")
+            await asyncio.sleep(wait_time)
+            
+            print("BROWSER: 🔄 Refreshing page...")
+            await self._page.reload(wait_until="domcontentloaded")
+            await self.handle_carousell_popups()
+            await self.inject_agent_ui()
+            
+        print("BROWSER: 🏁 Idle refresh period complete.")
+
+    async def check_for_new_messages(self, interval: int = 7, max_checks: int = 20) -> bool:
+        """
+        Stay on homepage, refresh periodically, and check for new message notifications.
+        
+        Returns:
+            True if a new message badge was detected.
+        """
+        print(f"BROWSER: 👀 Starting message check loop (interval: {interval}s, max_checks: {max_checks})...")
+        
+        # Navigate to home first
+        await self.navigate("https://www.carousell.sg")
+        
+        for i in range(max_checks):
+            wait_time = interval + (i % 4) # Variation between interval and interval+3
+            print(f"BROWSER: 😴 Sleeping for {wait_time}s... (Check {i+1}/{max_checks})")
+            await asyncio.sleep(wait_time)
+            
+            print("BROWSER: 🔄 Refreshing page...")
+            await self._page.reload(wait_until="domcontentloaded")
+            await self.handle_carousell_popups()
+            await self.inject_agent_ui()
+            
+            # Check for notification badge on the chat icon
+            # The Carousell nav has an inbox icon with a badge like <span class="D_azu D_azt">1</span>
+            badge_selectors = [
+                'a[href="/inbox/"] .D_azu',        # Badge class from DOM
+                'a[href="/inbox/"] .D_azt',        # Another potential badge class
+                'a[aria-label="Inbox"] span[class*="azu"]',
+                'a[aria-label="Inbox"] span[class*="azt"]',
+                '[href="/inbox/"] span',           # Any span inside inbox link
+            ]
+            
+            for selector in badge_selectors:
+                try:
+                    badge = await self._page.query_selector(selector)
+                    if badge and await badge.is_visible():
+                        text = await badge.inner_text()
+                        if text and text.strip().isdigit() and int(text.strip()) > 0:
+                            print(f"BROWSER: 💬 NEW MESSAGE DETECTED! Badge shows: {text}")
+                            return True
+                except:
+                    continue
+            
+            print("BROWSER: No new messages yet...")
+        
+        print("BROWSER: 🏁 Message check loop complete. No new messages found.")
+        return False
     
     async def wait_for_selector(self, selector: str, timeout: int = 10000) -> bool:
         """
