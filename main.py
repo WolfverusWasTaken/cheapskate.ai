@@ -36,7 +36,7 @@ BANNER = r"""
 
 HELP_TEXT = """
 Commands:
-  find <query>          - Search for items (e.g., "find iPhone 14 under $600")
+  find <query>          - Search for items (e.g., "find iPhone 14 under $3000")
   listings              - Show current extracted listings
   open <index>          - Open a specific listing
   chat <index>          - Open chat with seller
@@ -47,7 +47,7 @@ Commands:
   quit / exit           - Exit the agent
   
 Examples:
-  >>> find people selling iPhone 14 under $600
+  >>> find people selling iPhone 14 under $3000
   >>> listings
   >>> lowball 0
   >>> chat 1
@@ -76,7 +76,15 @@ async def main():
         # Navigate to Carousell
         print("🌐 Navigating to Carousell.sg...")
         await browser.navigate("https://www.carousell.sg")
-        await asyncio.sleep(2)  # Wait for page to fully load
+        await asyncio.sleep(2)
+        
+        # Auto-login if credentials provided and not already logged in
+        if config.agent.username and config.agent.password:
+            if not await browser.is_logged_in():
+                print("🔑 Auto-login triggered...")
+                await browser.login(config.agent.username, config.agent.password)
+            else:
+                print("✅ Already logged in (session restored)")
         
         # Initialize LLM and Controller
         print("🤖 Initializing LLM and Controller...")

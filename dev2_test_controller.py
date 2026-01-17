@@ -57,7 +57,7 @@ async def test_controller():
     
     test_prompts = [
         # Test 1: Search functionality
-        "Find iPhones under $600",
+        "Find iPhones under $3000",
         
         # Test 2: Extract listings
         "Show me the listings",

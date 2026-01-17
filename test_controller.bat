@@ -16,7 +16,7 @@ ollama run phi3 "You are the Controller agent for Carousell automation. You have
 3. open_chat(seller_index) - Open seller chat
 4. delegate_lowball(seller_index) - Start negotiation
 
-User request: Find iPhone 14 deals under $600
+User request: Find iPhone 14 deals under $3000
 
 Based on this request, what tools would you call and in what order? Explain your reasoning."
 

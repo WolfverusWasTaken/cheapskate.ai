@@ -287,7 +287,7 @@ if __name__ == "__main__":
     # Test completion (async)
     async def test_completion():
         result = await llm.complete([
-            {"role": "user", "content": "Search for iPhone deals under $600"}
+            {"role": "user", "content": "Search for iPhone deals under $3000"}
         ])
         print(f"\n✓ Completion result:")
         print(f"  Content: {result['content'][:100]}...")

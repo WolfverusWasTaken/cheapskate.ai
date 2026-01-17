@@ -30,18 +30,26 @@ class CarousellListing(BaseModel):
 
 def parse_price(price_str: str) -> float:
     """
-    Parse a price string to float.
+    Parse a price string to float, handling cases like "From S$538" or "$1,200".
     
     Args:
-        price_str: Price string like "S$800" or "$1,200"
+        price_str: Price string
         
     Returns:
-        Float price value
+        Float price value or 0.0 if failed
     """
-    # Remove currency symbols and whitespace
-    cleaned = re.sub(r'[S$,\s]', '', price_str)
+    if not price_str:
+        return 0.0
+        
+    # Extract only the currency-related part (digits, commas, dots)
+    # We look for the first occurrence of $ followed by numbers, or just numbers
+    match = re.search(r'[\d,]+(?:\.\d{1,2})?', price_str)
+    if not match:
+        return 0.0
+        
+    price_num_str = match.group().replace(',', '')
     try:
-        return float(cleaned)
+        return float(price_num_str)
     except ValueError:
         return 0.0
 
@@ -124,15 +132,23 @@ def extract_listing_info(container, index: int) -> Optional[dict]:
         
         # Extract price - look for currency patterns
         price_text = ""
+        # Try specific attribute first
         price_elem = container.select_one('[data-testid*="price"], [class*="price"]')
         if price_elem:
             price_text = price_elem.get_text(strip=True)
-        else:
-            # Search for S$ or $ pattern in text
-            full_text = container.get_text()
-            price_match = re.search(r'S?\$[\d,]+(?:\.\d{2})?', full_text)
+        
+        # If still empty or no number found, try regex on full container text
+        if not price_text or not re.search(r'\d', price_text):
+            full_text = container.get_text(" ", strip=True)
+            # Regex to find: S$123, $123, 123.45 (with or without From)
+            price_match = re.search(r'(?:S?\$|From\s+S?\$)\s*([\d,]+(?:\.\d{2})?)', full_text, re.IGNORECASE)
             if price_match:
-                price_text = price_match.group()
+                price_text = price_match.group(0)
+            else:
+                # Last resort: just find any number with a $ nearby
+                price_match = re.search(r'[\d,]+(?:\.\d{2})?', full_text)
+                if price_match:
+                    price_text = price_match.group(0)
         
         price = parse_price(price_text)
         
@@ -271,8 +287,8 @@ if __name__ == "__main__":
         print(f"  [{l['index']}] {l['title']} - ${l['price']}")
     
     # Test filtering
-    filtered = filter_listings_by_price(listings, 600)
-    print(f"\n✓ Listings under $600: {len(filtered)}")
+    filtered = filter_listings_by_price(listings, 3000)
+    print(f"\n✓ Listings under $3000: {len(filtered)}")
     
     # Test display formatting
     print("\n" + format_listings_for_display(listings))

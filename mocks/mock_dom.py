@@ -146,7 +146,7 @@ if __name__ == "__main__":
         print(f"  [{l['index']}] {l['title']} - ${l['price']}")
     
     # Test filtering
-    filtered = filter_listings_by_price(listings, 600)
-    print(f"\n✓ Filtered to {len(filtered)} listings under $600")
+    filtered = filter_listings_by_price(listings, 3000)
+    print(f"\n✓ Filtered to {len(filtered)} listings under $3000")
     
     print("\n✓ Mock DOM test passed!")

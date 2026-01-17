@@ -26,6 +26,8 @@ class AgentConfig(BaseModel):
     initial_lowball_percent: int = 50
     max_offer_percent: int = 70
     headless_browser: bool = False
+    username: str = ""
+    password: str = ""
 
 
 class Config:
@@ -44,6 +46,8 @@ class Config:
             initial_lowball_percent=int(os.getenv("INITIAL_LOWBALL_PERCENT", "50")),
             max_offer_percent=int(os.getenv("MAX_OFFER_PERCENT", "70")),
             headless_browser=os.getenv("HEADLESS_BROWSER", "false").lower() == "true",
+            username=os.getenv("CAROUSELL_USERNAME", ""),
+            password=os.getenv("CAROUSELL_PASSWORD", ""),
         )
         
         # Carousell-specific settings

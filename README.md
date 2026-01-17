@@ -258,7 +258,7 @@ Dev 3: Works on lowballer.py using mocks
 $ python main.py
 [Visible Chromium opens to carousell.sg]
 
->>> find people selling iPhone 14 under $600
+>>> find people selling iPhone 14 under $3000
 [AGENT: Navigating to search... Extracting 5 listings...]
 
 >>> lowball 0
@@ -289,7 +289,7 @@ ollama run phi3 "Generate a short lowball message for iPhone 14 at $800. Offer $
 ## 📊 Data Flow
 
 ```
-User Input ("find iPhone under $600")
+User Input ("find iPhone under $3000")
        │
        ▼
 ┌─────────────────┐

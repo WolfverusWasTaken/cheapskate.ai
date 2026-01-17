@@ -14,6 +14,18 @@ sys.path.insert(0, '.')
 from browser_loader import BrowserLoader
 from dom_extractor import extract_dom, extract_visible_text
 from dom_parser import parse_listings, filter_listings_by_price, format_listings_for_display
+from config import config
+
+
+
+async def ensure_login(browser):
+    """Helper to login if credentials are set in .env."""
+    if config.agent.username and config.agent.password:
+        if not await browser.is_logged_in():
+            print("🔑 Auto-login triggered...")
+            await browser.login(config.agent.username, config.agent.password)
+        else:
+            print("✅ Already logged in (session restored)")
 
 
 async def test_browser_loader():
@@ -31,6 +43,9 @@ async def test_browser_loader():
     browser, context, page = await loader.launch()
     assert loader.is_launched, "Browser should be launched"
     print("   ✅ Browser launched")
+    
+    # Auto-login
+    await ensure_login(loader)
     
     # Test navigation
     print("\n📍 Testing navigate()...")
@@ -136,8 +151,8 @@ async def test_dom_parser(dom_data: dict = None):
     
     # Test filter
     print("\n📍 Testing filter_listings_by_price()...")
-    filtered = filter_listings_by_price(listings, 600)
-    print(f"   Listings under $600: {len(filtered)}")
+    filtered = filter_listings_by_price(listings, 3000)
+    print(f"   Listings under $3000: {len(filtered)}")
     
     # Test display formatting
     print("\n📍 Testing format_listings_for_display()...")
@@ -161,6 +176,9 @@ async def full_integration_test():
         # Step 1: Launch
         print("\n[1/4] Launching browser...")
         await loader.launch()
+        
+        # Auto-login
+        await ensure_login(loader)
         
         # Step 2: Navigate to search
         print("[2/4] Navigating to Carousell search...")

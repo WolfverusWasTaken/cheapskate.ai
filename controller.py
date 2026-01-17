@@ -415,7 +415,7 @@ if __name__ == "__main__":
         
         # Test prompts
         test_prompts = [
-            "Find iPhones under $600",
+            "Find iPhones under $3000",
             "Show me the listings",
         ]
         

@@ -9,6 +9,7 @@ Provides:
 """
 
 import asyncio
+import os
 from typing import Optional
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page, Playwright
 
@@ -48,6 +49,9 @@ class BrowserLoader:
         
         self._playwright = await async_playwright().start()
         
+        # Try to load existing session if it exists
+        auth_path = "auth/state.json"
+        
         # Launch with visible browser and reasonable viewport
         self._browser = await self._playwright.chromium.launch(
             headless=self.headless,
@@ -59,11 +63,16 @@ class BrowserLoader:
         )
         
         # Create context with realistic user agent
+        storage_state = auth_path if os.path.exists(auth_path) else None
+        if storage_state:
+            print(f"BROWSER: Loading session from {auth_path}")
+            
         self._context = await self._browser.new_context(
             viewport={'width': 1280, 'height': 800},
             user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             locale='en-SG',
             timezone_id='Asia/Singapore',
+            storage_state=storage_state
         )
         
         self._page = await self._context.new_page()
@@ -111,6 +120,10 @@ class BrowserLoader:
             print(f"BROWSER: Navigating to {url}...")
             await self._page.goto(url, wait_until=wait_until, timeout=30000)
             print(f"BROWSER: ✓ Navigation complete → {self._page.url}")
+            
+            # Inject Agent HUD
+            await self.inject_agent_ui()
+            
             return True
         except Exception as e:
             print(f"BROWSER: ✗ Navigation failed → {e}")
@@ -169,6 +182,165 @@ class BrowserLoader:
             
         self._launched = False
         print("BROWSER: ✓ Browser closed")
+
+    async def inject_agent_ui(self):
+        """Injects a glowing HUD to show the browser is under AI control."""
+        if not self._page:
+            return
+
+        print("BROWSER: 🤖 Injecting Agent HUD...")
+        
+        hud_css = """
+        @keyframes agentPulse {
+            0% { box-shadow: inset 0 0 15px rgba(0, 200, 255, 0.4); }
+            100% { box-shadow: inset 0 0 40px rgba(0, 200, 255, 0.7); }
+        }
+        #agent-hud-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 2147483647;
+            animation: agentPulse 2s infinite alternate ease-in-out;
+            border: 4px solid rgba(0, 200, 255, 0.3);
+            box-sizing: border-box;
+        }
+        #agent-badge {
+            position: fixed;
+            top: 10px;
+            right: 20px;
+            background: rgba(0, 20, 30, 0.85);
+            color: #00d9ff;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            font-size: 12px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            border: 1px solid #00d9ff;
+            box-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
+            z-index: 2147483647;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            backdrop-filter: blur(4px);
+        }
+        .agent-dot {
+            width: 8px;
+            height: 8px;
+            background: #00d9ff;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #00d9ff;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            50% { opacity: 0.3; }
+        }
+        """
+
+        hud_js = f"""
+        (() => {{
+            if (document.getElementById('agent-hud-overlay')) return;
+            
+            const style = document.createElement('style');
+            style.textContent = `{hud_css}`;
+            document.head.appendChild(style);
+            
+            const hud = document.createElement('div');
+            hud.id = 'agent-hud-overlay';
+            
+            const badge = document.createElement('div');
+            badge.id = 'agent-badge';
+            badge.innerHTML = '<span class="agent-dot"></span> LOWBALLER AGENT ACTIVE';
+            
+            document.body.appendChild(hud);
+            document.body.appendChild(badge);
+        }})();
+        """
+        
+        try:
+            await self._page.evaluate(hud_js)
+        except Exception as e:
+            print(f"BROWSER: HUD injection skipped (likely non-HTML page): {e}")
+
+    async def is_logged_in(self) -> bool:
+        """Check if the user is currently logged in."""
+        if not self._page:
+            return False
+            
+        try:
+            # Look for profile dropdown or specific logged-in indicator
+            # Carousell's profile dropdown usually has a specific testid or icon
+            logged_in_element = await self._page.query_selector('[data-testid="nav-profile-dropdown"], a[href="/profile/"]')
+            return logged_in_element is not None
+        except:
+            return False
+
+    async def login(self, username, password):
+        """Perform automated login."""
+        if not self._page:
+            return False
+            
+        if await self.is_logged_in():
+            print("BROWSER: Already logged in")
+            return True
+            
+        print(f"BROWSER: 🔑 Attempting login for {username}...")
+        await self.navigate("https://www.carousell.sg/login")
+        await asyncio.sleep(3)
+        
+        try:
+            # Wait for login fields - Try multiple common selectors
+            print("BROWSER: Entering credentials...")
+            
+            # Username/Email field
+            user_selectors = ['input[name="username"]', 'input[name="email"]', '#username', '#email']
+            for selector in user_selectors:
+                try:
+                    await self._page.wait_for_selector(selector, timeout=2000)
+                    await self._page.fill(selector, username)
+                    break
+                except: continue
+            
+            # Password field
+            pass_selectors = ['input[name="password"]', '#password']
+            for selector in pass_selectors:
+                try:
+                    await self._page.wait_for_selector(selector, timeout=2000)
+                    await self._page.fill(selector, password)
+                    break
+                except: continue
+            
+            # Click login button
+            submit_selectors = ['button[type="submit"]', 'button:has-text("Login")', 'button:has-text("Log in")']
+            for selector in submit_selectors:
+                try:
+                    await self._page.click(selector, timeout=2000)
+                    break
+                except: continue
+            
+            # Wait for navigation or profile element
+            print("BROWSER: Login submitted, waiting for verification (check for manual CAPTCHA if needed)...")
+            
+            # Success indicator
+            try:
+                await self._page.wait_for_selector('[data-testid="nav-profile-dropdown"]', timeout=30000)
+                print("BROWSER: ✓ Login successful!")
+                
+                # Save storage state for future sessions
+                os.makedirs("auth", exist_ok=True)
+                await self._context.storage_state(path="auth/state.json")
+                return True
+            except:
+                print("BROWSER: ⚠️ Login verification timed out. You may need to solve a CAPTCHA manually.")
+                return False
+                
+        except Exception as e:
+            print(f"BROWSER: ✗ Login failed: {e}")
+            await self.screenshot("screenshots/login_error.png")
+            return False
     
     @property
     def is_launched(self) -> bool:
