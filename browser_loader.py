@@ -266,81 +266,189 @@ class BrowserLoader:
             print(f"BROWSER: HUD injection skipped (likely non-HTML page): {e}")
 
     async def is_logged_in(self) -> bool:
-        """Check if the user is currently logged in."""
+        """Check if the user is currently logged in by checking the homepage."""
         if not self._page:
             return False
             
         try:
-            # Look for profile dropdown or specific logged-in indicator
-            # Carousell's profile dropdown usually has a specific testid or icon
-            logged_in_element = await self._page.query_selector('[data-testid="nav-profile-dropdown"], a[href="/profile/"]')
-            return logged_in_element is not None
-        except:
+            # Navigate to home to check login status
+            current_url = self._page.url
+            if "carousell.sg" not in current_url:
+                await self.navigate("https://www.carousell.sg")
+                await asyncio.sleep(2)
+            
+            # Check for logged-in indicators:
+            # - Profile avatar/dropdown (logged in)
+            # - "Login" or "Sign up" text/button (NOT logged in)
+            login_button = await self._page.query_selector('a[href="/login/"], button:has-text("Login"), button:has-text("Log in")')
+            
+            if login_button:
+                # Found login button = NOT logged in
+                return False
+            
+            # Look for profile indicators
+            profile_indicators = [
+                'img[alt*="Profile"]',
+                'img[alt*="Avatar"]',
+                '[aria-label*="Profile"]',
+                'a[href*="/u/"]',  # User profile links
+            ]
+            for selector in profile_indicators:
+                el = await self._page.query_selector(selector)
+                if el:
+                    return True
+            
+            return False
+        except Exception as e:
+            print(f"BROWSER: Login check error: {e}")
             return False
 
     async def login(self, username, password):
         """Perform automated login."""
         if not self._page:
             return False
-            
-        if await self.is_logged_in():
-            print("BROWSER: Already logged in")
-            return True
-            
+        
         print(f"BROWSER: 🔑 Attempting login for {username}...")
-        await self.navigate("https://www.carousell.sg/login")
+        await self.navigate("https://www.carousell.sg/login/")
         await asyncio.sleep(3)
         
         try:
-            # Wait for login fields - Try multiple common selectors
-            print("BROWSER: Entering credentials...")
+            # Step 1: Click "Email, username or mobile" button to switch to email login
+            print("BROWSER: Looking for 'Email, username or mobile' button...")
+            email_login_selectors = [
+                'button:has-text("Email, username or mobile")',
+                'button:has-text("Email")',
+                'button:has-text("email")',
+                'div:has-text("Email, username or mobile")',
+                '[data-testid*="email"]',
+            ]
             
-            # Username/Email field
-            user_selectors = ['input[name="username"]', 'input[name="email"]', '#username', '#email']
+            clicked_email = False
+            for selector in email_login_selectors:
+                try:
+                    btn = await self._page.wait_for_selector(selector, timeout=3000)
+                    if btn:
+                        await btn.click()
+                        clicked_email = True
+                        print(f"BROWSER: ✓ Clicked email login button")
+                        await asyncio.sleep(1)
+                        break
+                except:
+                    continue
+            
+            if not clicked_email:
+                print("BROWSER: ⚠️ Could not find 'Email' button - trying direct input")
+            
+            # Step 2: Fill username/email field
+            print("BROWSER: Entering credentials...")
+            username_filled = False
+            user_selectors = [
+                'input[type="text"]',
+                'input[type="email"]',
+                'input[name="username"]',
+                'input[name="email"]',
+                'input[placeholder*="email"]',
+                'input[placeholder*="Email"]',
+                'input[placeholder*="username"]',
+                'input[placeholder*="mobile"]',
+            ]
             for selector in user_selectors:
                 try:
-                    await self._page.wait_for_selector(selector, timeout=2000)
-                    await self._page.fill(selector, username)
-                    break
-                except: continue
+                    el = await self._page.wait_for_selector(selector, timeout=3000)
+                    if el:
+                        await el.fill(username)
+                        username_filled = True
+                        print(f"BROWSER: ✓ Filled username")
+                        break
+                except: 
+                    continue
             
-            # Password field
-            pass_selectors = ['input[name="password"]', '#password']
+            if not username_filled:
+                print("BROWSER: ✗ Could not find username field")
+                await self.screenshot("screenshots/login_error_username.png")
+                return False
+            
+            # Step 3: Fill password field
+            password_filled = False
+            pass_selectors = [
+                'input[type="password"]',
+                'input[name="password"]',
+                'input[placeholder*="password"]',
+                'input[placeholder*="Password"]',
+            ]
             for selector in pass_selectors:
                 try:
-                    await self._page.wait_for_selector(selector, timeout=2000)
-                    await self._page.fill(selector, password)
-                    break
-                except: continue
+                    el = await self._page.wait_for_selector(selector, timeout=3000)
+                    if el:
+                        await el.fill(password)
+                        password_filled = True
+                        print(f"BROWSER: ✓ Filled password")
+                        break
+                except: 
+                    continue
             
-            # Click login button
-            submit_selectors = ['button[type="submit"]', 'button:has-text("Login")', 'button:has-text("Log in")']
+            if not password_filled:
+                print("BROWSER: ✗ Could not find password field")
+                await self.screenshot("screenshots/login_error_password.png")
+                return False
+            
+            # Step 4: Click login button
+            await asyncio.sleep(0.5)
+            submit_selectors = [
+                'button[type="submit"]',
+                'button:has-text("Log in")',
+                'button:has-text("Login")',
+                'button:has-text("Sign in")',
+            ]
+            clicked = False
             for selector in submit_selectors:
                 try:
-                    await self._page.click(selector, timeout=2000)
-                    break
-                except: continue
+                    btn = await self._page.query_selector(selector)
+                    if btn:
+                        await btn.click()
+                        clicked = True
+                        print(f"BROWSER: ✓ Clicked login button")
+                        break
+                except: 
+                    continue
             
-            # Wait for navigation or profile element
-            print("BROWSER: Login submitted, waiting for verification (check for manual CAPTCHA if needed)...")
-            
-            # Success indicator
-            try:
-                await self._page.wait_for_selector('[data-testid="nav-profile-dropdown"]', timeout=30000)
-                print("BROWSER: ✓ Login successful!")
-                
-                # Save storage state for future sessions
-                os.makedirs("auth", exist_ok=True)
-                await self._context.storage_state(path="auth/state.json")
-                return True
-            except:
-                print("BROWSER: ⚠️ Login verification timed out. You may need to solve a CAPTCHA manually.")
+            if not clicked:
+                print("BROWSER: ✗ Could not find submit button")
+                await self.screenshot("screenshots/login_error_submit.png")
                 return False
+            
+            # Step 5: Wait for login to complete
+            print("BROWSER: Login submitted, waiting for verification...")
+            print("BROWSER: ⚠️  If you see a CAPTCHA, please solve it manually in the browser window.")
+            
+            # Wait up to 60 seconds for login to complete
+            for i in range(60):
+                await asyncio.sleep(1)
+                current_url = self._page.url
+                
+                # If we navigated away from login page, success!
+                if "/login" not in current_url:
+                    print("BROWSER: ✓ Login successful!")
+                    
+                    # Save storage state for future sessions
+                    os.makedirs("auth", exist_ok=True)
+                    await self._context.storage_state(path="auth/state.json")
+                    print("BROWSER: ✓ Session saved to auth/state.json")
+                    return True
+                
+                # Show progress every 10 seconds
+                if (i + 1) % 10 == 0:
+                    print(f"BROWSER: Still waiting... ({i + 1}s) - solve CAPTCHA if present")
+            
+            print("BROWSER: ⚠️ Login verification timed out after 60s.")
+            await self.screenshot("screenshots/login_timeout.png")
+            return False
                 
         except Exception as e:
             print(f"BROWSER: ✗ Login failed: {e}")
             await self.screenshot("screenshots/login_error.png")
             return False
+
     
     @property
     def is_launched(self) -> bool:

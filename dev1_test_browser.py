@@ -20,12 +20,24 @@ from config import config
 
 async def ensure_login(browser):
     """Helper to login if credentials are set in .env."""
-    if config.agent.username and config.agent.password:
-        if not await browser.is_logged_in():
-            print("🔑 Auto-login triggered...")
-            await browser.login(config.agent.username, config.agent.password)
+    print("\n🔐 Checking login status...")
+    
+    if not config.agent.username or not config.agent.password:
+        print("⚠️  No credentials found in .env (CAROUSELL_USERNAME/CAROUSELL_PASSWORD)")
+        print("   Skipping auto-login. Set these in your .env file to enable.")
+        return
+    
+    print(f"   Credentials found for: {config.agent.username}")
+    
+    if not await browser.is_logged_in():
+        print("🔑 Auto-login triggered...")
+        success = await browser.login(config.agent.username, config.agent.password)
+        if success:
+            print("✅ Login complete!")
         else:
-            print("✅ Already logged in (session restored)")
+            print("⚠️  Login may have failed - check browser window")
+    else:
+        print("✅ Already logged in (session restored)")
 
 
 async def test_browser_loader():
