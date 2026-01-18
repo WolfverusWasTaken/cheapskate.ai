@@ -30,3 +30,9 @@ chat_history.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Sensitive Auth/Session Data
+auth/
+*.json
+!package.json
+!package-lock.json

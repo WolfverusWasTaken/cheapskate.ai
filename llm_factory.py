@@ -181,7 +181,7 @@ class LLMClient:
                 "tool_calls": [],
             }
     
-    def generate_lowball_message(self, listing_price: float, item_name: str, round_num: int = 1) -> str:
+    async def generate_lowball_message(self, listing_price: float, item_name: str, round_num: int = 1) -> str:
         """
         Generate a lowball negotiation message.
         
@@ -300,13 +300,13 @@ if __name__ == "__main__":
     llm = LLMFactory.from_env()
     print(f"✓ Created LLM client: {llm.model}")
     
-    # Test lowball message generation
-    message = llm.generate_lowball_message(800, "iPhone 14 Pro", round_num=1)
-    print(f"\n✓ Generated lowball message:")
-    print(f"  '{message}'")
-    
-    # Test completion (async)
-    async def test_completion():
+    async def run_tests():
+        # Test lowball message generation (now async)
+        message = await llm.generate_lowball_message(800, "iPhone 14 Pro", round_num=1)
+        print(f"\n✓ Generated lowball message:")
+        print(f"  '{message}'")
+        
+        # Test completion (async)
         result = await llm.complete([
             {"role": "user", "content": "Search for iPhone deals under $3000"}
         ])
@@ -315,6 +315,6 @@ if __name__ == "__main__":
         if result.get("tool_calls"):
             print(f"  Tool calls: {result['tool_calls']}")
     
-    asyncio.run(test_completion())
+    asyncio.run(run_tests())
     
     print("\nLLM_FACTORY: ✓ All tests passed!")
