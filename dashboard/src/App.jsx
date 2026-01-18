@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import ItemCard from './components/ItemCard'
 import { mockData } from './data/mockData'
 import './App.css'
@@ -54,7 +54,15 @@ function ChatPanel() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [isSending, setIsSending] = useState(false)
-  const chatEndRef = useState(null)
+  const chatEndRef = useRef(null)
+
+  const scrollToBottom = () => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
 
   // Poll for logs
   useEffect(() => {

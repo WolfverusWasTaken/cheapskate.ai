@@ -352,7 +352,13 @@ Classify this response:"""
         # Get full chat history for context
         seller_id = self._get_seller_id(listing_data)
         history = self.chat_history.get(seller_id, {}).get("messages", [])
-        history_text = "\n".join([f"{m['role']}: {m['content']}" for m in history[-10:]]) # Last 10 msgs
+        history_text = "\n".join([f"{m['role']}: {m['content']}" for m in history[-10:]])
+
+        # Build price context
+        if offer_price:
+            price_context = f"Listed Price: S${listing_price}\nYour Target Offer: S${offer_price}"
+        else:
+            price_context = "Determine your next offer based on the conversation. Be strategic and reasonable."
 
         messages = [
             {
@@ -364,10 +370,8 @@ Classify this response:"""
                 "content": f"""Generate a negotiation message for Carousell:
 
 Item: {item_name}
-Listed Price: S${listing_price}
-Your Offer: S${offer_price}
+{price_context}
 Round: {round_num}
-Description: {listing_data.get('description', 'N/A')}
 
 CHAT HISTORY:
 {history_text}
