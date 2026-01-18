@@ -54,7 +54,7 @@ function ChatPanel() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [isSending, setIsSending] = useState(false)
-<<<<<<< Updated upstream
+  const [isRecording, setIsRecording] = useState(false)
   const chatEndRef = useRef(null)
 
   const scrollToBottom = () => {
@@ -64,10 +64,6 @@ function ChatPanel() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
-=======
-  const [isRecording, setIsRecording] = useState(false)
-  const chatEndRef = useState(null)
->>>>>>> Stashed changes
 
   // Poll for logs
   useEffect(() => {
