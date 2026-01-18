@@ -42,6 +42,7 @@ Commands:
   open <index>          - Open a specific listing
   chat <index>          - Open chat with seller
   lowball <index>       - Start negotiation on a listing
+  voice                 - Record voice message, transcribe, and send to chat
   check_chat            - Go to inbox and stay updated
   screenshot            - Take a screenshot
   history               - Show negotiation history
@@ -53,6 +54,7 @@ Examples:
   >>> listings
   >>> lowball 0
   >>> chat 1
+  >>> voice
 """
 
 
@@ -195,6 +197,9 @@ async def main():
                 
                 if lower_prompt == 'screenshot':
                     prompt = "take a screenshot of the current page"
+                
+                if lower_prompt == 'voice':
+                    prompt = "record voice message and send to chat"
                 
                 if lower_prompt == 'check_chat' or lower_prompt == 'inbox':
                     prompt = "go to the inbox and stay updated"

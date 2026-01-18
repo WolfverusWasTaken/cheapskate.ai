@@ -164,6 +164,23 @@ class ControllerAgent:
                     }
                 }
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "send_voice_message",
+                    "description": "Record audio from microphone, transcribe using Gemini AI, and send the message to the current chat.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "duration": {
+                                "type": "integer",
+                                "description": "Recording duration in seconds (default: 10)"
+                            }
+                        },
+                        "required": []
+                    }
+                }
+            },
         ]
     
     def _define_tool_handlers(self) -> dict[str, Callable]:
@@ -176,6 +193,7 @@ class ControllerAgent:
             "delegate_lowball": self._handle_delegate_lowball,
             "check_chat": self._handle_check_chat,
             "take_screenshot": self._handle_screenshot,
+            "send_voice_message": self._handle_voice_message,
         }
     
     async def run(self, user_prompt: str) -> str:
@@ -227,11 +245,13 @@ You have access to these tools:
 - open_listing(listing_index): View a specific listing
 - open_chat(listing_index): Open chat with seller
 - delegate_lowball(listing_index): Start negotiation
+- send_voice_message(duration): Record voice, transcribe, and send to chat
 - check_chat(): Go to inbox and stay updated
 - take_screenshot(): Capture current page
 
 When the user asks to find items, use search_carousell first, then extract_listings to show results.
 When they want to negotiate, use delegate_lowball to start the lowball negotiation.
+When they want to send a voice message, use send_voice_message to record and send.
 When they want to check messages or see what sellers said, use check_chat.
 
 Be helpful, proactive, and explain what you're doing."""
@@ -945,6 +965,106 @@ Be helpful, proactive, and explain what you're doing."""
         
         path = await self.browser.screenshot(filename)
         return f"Screenshot saved: {path}"
+    
+    async def _handle_voice_message(self, duration: int = 10) -> str:
+        """
+        Handle send_voice_message tool.
+        Records audio from microphone, transcribes using Gemini, and sends to chat.
+        """
+        page = self.browser.get_page()
+        if not page:
+            return "Browser not ready"
+        
+        # Check if we're on a chat page
+        current_url = page.url
+        if "/chat/" not in current_url and "/inbox" not in current_url:
+            return "Not currently in a chat. Use 'chat <index>' to open a chat first."
+        
+        # Import speech transcriber (lazy load)
+        try:
+            from speech_transcriber import AudioRecorder, SpeechTranscriber, AUDIO_AVAILABLE, GENAI_AVAILABLE
+        except ImportError:
+            return "Speech transcriber not available. Install: pip install sounddevice scipy google-generativeai"
+        
+        if not AUDIO_AVAILABLE:
+            return "Audio recording not available. Install: pip install sounddevice scipy"
+        
+        if not GENAI_AVAILABLE:
+            return "Gemini API not available. Install: pip install google-generativeai"
+        
+        # Initialize recorder and transcriber
+        recorder = AudioRecorder()
+        transcriber = SpeechTranscriber()
+        
+        # Record audio
+        print(f"\n🎤 VOICE MESSAGE: Recording for {duration} seconds...")
+        audio_path = await recorder.record_async(duration)
+        
+        if not audio_path:
+            return "Failed to record audio. Check microphone permissions."
+        
+        # Transcribe
+        print("🔄 VOICE MESSAGE: Transcribing...")
+        transcribed_text = await transcriber.transcribe_async(audio_path)
+        
+        if not transcribed_text:
+            return "Failed to transcribe audio. Check Gemini API key."
+        
+        print(f"📝 VOICE MESSAGE: Transcribed → \"{transcribed_text}\"")
+        
+        # Send to chat (similar to lowballer._send_message)
+        try:
+            # Wait for chat input to be ready
+            await asyncio.sleep(1)
+            
+            # Try to find the chat textarea
+            text_box = page.locator('textarea[placeholder="Type here..."]')
+            
+            # Wait for it to be visible
+            await text_box.wait_for(state="visible", timeout=5000)
+            
+            # Fill with the transcribed message
+            await text_box.fill(transcribed_text)
+            print(f"VOICE MESSAGE: ✓ Typed message into chat input")
+            
+            # Small delay before sending
+            await asyncio.sleep(0.3)
+            
+            # Press Enter to send
+            await text_box.press("Enter")
+            print(f"VOICE MESSAGE: ✓ Message sent")
+            
+            # Cleanup audio file
+            try:
+                import os
+                os.remove(audio_path)
+            except:
+                pass
+            
+            return f"Voice message sent: \"{transcribed_text}\""
+            
+        except Exception as e:
+            print(f"VOICE MESSAGE: ✗ Failed to send: {e}")
+            
+            # Fallback: Try alternative selectors
+            fallback_selectors = [
+                'textarea[placeholder*="Type"]',
+                'textarea[placeholder*="message"]',
+                '[contenteditable="true"]',
+                'textarea',
+            ]
+            
+            for selector in fallback_selectors:
+                try:
+                    el = page.locator(selector).first
+                    if await el.is_visible():
+                        await el.fill(transcribed_text)
+                        await el.press("Enter")
+                        return f"Voice message sent: \"{transcribed_text}\""
+                except:
+                    continue
+            
+            return f"Transcribed: \"{transcribed_text}\" but failed to send to chat. Chat input not found."
 
 
 # Standalone test

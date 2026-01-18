@@ -7,3 +7,8 @@ pydantic>=2.0.0
 asyncio-atexit>=1.0.1
 aiofiles>=23.0.0
 playwright-stealth>=1.0.6
+
+# Speech-to-text (voice message feature)
+sounddevice>=0.4.6
+scipy>=1.11.0
+google-generativeai>=0.5.0
