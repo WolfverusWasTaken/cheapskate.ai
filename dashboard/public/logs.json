@@ -1,1 +1,5 @@
+<<<<<<< Updated upstream
 [{"timestamp": "10:59:42", "sender": "SYSTEM", "text": "Agent started and connected to browser."}]
+=======
+[{"timestamp": "11:18:34", "sender": "SYSTEM", "text": "Agent started and connected to browser."}, {"timestamp": "11:18:45", "sender": "USER", "text": "find alexi george"}, {"timestamp": "11:18:45", "sender": "AGENT", "text": "Processing command..."}, {"timestamp": "11:19:59", "sender": "AGENT", "text": "\u2713 search_carousell: Found 3 listings for 'alexi george' (displayed above)"}, {"timestamp": "11:20:13", "sender": "USER", "text": "chat 0"}, {"timestamp": "11:20:13", "sender": "AGENT", "text": "Processing command..."}, {"timestamp": "11:20:28", "sender": "AGENT", "text": "\u2713 open_listing: Failed to open listing 0"}]
+>>>>>>> Stashed changes

@@ -54,6 +54,7 @@ function ChatPanel() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [isSending, setIsSending] = useState(false)
+<<<<<<< Updated upstream
   const chatEndRef = useRef(null)
 
   const scrollToBottom = () => {
@@ -63,6 +64,10 @@ function ChatPanel() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+=======
+  const [isRecording, setIsRecording] = useState(false)
+  const chatEndRef = useState(null)
+>>>>>>> Stashed changes
 
   // Poll for logs
   useEffect(() => {
@@ -109,6 +114,37 @@ function ChatPanel() {
     }
   }
 
+  const handleMic = async () => {
+    if (isRecording || isSending) return
+
+    setIsRecording(true)
+
+    // Add visual feedback
+    setMessages(prev => [...prev, {
+      timestamp: new Date().toLocaleTimeString(),
+      sender: 'SYSTEM',
+      text: '🎤 Recording... Speak into your microphone'
+    }])
+
+    try {
+      await fetch('http://127.0.0.1:5001/cmd', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: 'voice' })
+      })
+    } catch (err) {
+      console.error('Failed to send voice command:', err)
+      setMessages(prev => [...prev, {
+        timestamp: new Date().toLocaleTimeString(),
+        sender: 'ERROR',
+        text: 'Failed to start voice recording. Is the agent running?'
+      }])
+    } finally {
+      // Recording takes ~10 seconds on backend
+      setTimeout(() => setIsRecording(false), 12000)
+    }
+  }
+
   return (
     <div className="chat-panel">
       <div className="chat-header">
@@ -134,9 +170,18 @@ function ChatPanel() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Type a command (e.g., find mice)..."
-          disabled={isSending}
+          disabled={isSending || isRecording}
         />
-        <button type="submit" disabled={isSending}>
+        <button
+          type="button"
+          className={`mic-btn ${isRecording ? 'recording' : ''}`}
+          onClick={handleMic}
+          disabled={isSending || isRecording}
+          title="Record voice message"
+        >
+          {isRecording ? '🔴' : '🎤'}
+        </button>
+        <button type="submit" disabled={isSending || isRecording}>
           {isSending ? '...' : 'Send'}
         </button>
       </form>
