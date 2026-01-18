@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cheapskate.ai - AI-Powered Carousell Negotiator</title>
+    <meta name="description" content="An autonomous AI agent that finds deals and negotiates prices on Carousell Singapore using advanced psychological tactics.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#10B981',
+                        accent: '#6366F1',
+                        dark: {
+                            900: '#0a0a0f',
+                            800: '#12121a',
+                            700: '#1a1a24',
+                            600: '#24242e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-text {
+            background: linear-gradient(135deg, #10B981 0%, #6366F1 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .glow {
+            box-shadow: 0 0 60px rgba(16, 185, 129, 0.15);
+        }
+        .card-hover {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+        .flow-line {
+            background: linear-gradient(180deg, #10B981 0%, #6366F1 100%);
+        }
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+    </style>
+</head>
+<body class="bg-dark-900 text-gray-100 min-h-screen">
+    <!-- Hero Section -->
+    <header class="relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10"></div>
+        <div class="max-w-6xl mx-auto px-6 py-20 relative">
+            <div class="text-center">
+                <div class="inline-flex items-center gap-2 bg-dark-700 border border-dark-600 rounded-full px-4 py-2 mb-6">
+                    <span class="w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+                    <span class="text-sm text-gray-400">Hackathon Project</span>
+                </div>
+                <h1 class="text-5xl md:text-7xl font-extrabold mb-6">
+                    <span class="gradient-text">Cheapskate.ai</span>
+                </h1>
+                <p class="text-xl md:text-2xl text-gray-400 max-w-3xl mx-auto mb-8">
+                    An autonomous AI agent that finds deals and negotiates prices on 
+                    <span class="text-white font-semibold">Carousell Singapore</span> using 
+                    <span class="text-primary">Chris Voss's FBI negotiation tactics</span>.
+                </p>
+                <div class="flex flex-wrap justify-center gap-4">
+                    <a href="https://github.com/WolfverusWasTaken/cheapskate.ai" target="_blank" 
+                       class="inline-flex items-center gap-2 bg-dark-700 hover:bg-dark-600 border border-dark-600 rounded-lg px-6 py-3 transition-colors">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                        View on GitHub
+                    </a>
+                    <a href="https://devpost.com/software/cheapskate-ai" target="_blank"
+                       class="inline-flex items-center gap-2 bg-primary hover:bg-primary/80 text-dark-900 font-semibold rounded-lg px-6 py-3 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        View on Devpost
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Tech Stack -->
+    <section class="py-20 border-t border-dark-700">
+        <div class="max-w-6xl mx-auto px-6">
+            <h2 class="text-3xl font-bold text-center mb-4">Tech Stack</h2>
+            <p class="text-gray-400 text-center mb-12 max-w-2xl mx-auto">Built with modern technologies for autonomous web automation and intelligent negotiation.</p>
+            
+            <div class="grid md:grid-cols-3 gap-6">
+                <!-- Brain -->
+                <div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 card-hover glow">
+                    <div class="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">The Brain</h3>
+                    <p class="text-gray-400 text-sm mb-4">AI reasoning and decision making</p>
+                    <ul class="space-y-2 text-sm">
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-primary rounded-full"></span>Python 3.10+</li>
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-primary rounded-full"></span>LiteLLM (Multi-provider)</li>
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-primary rounded-full"></span>Gemini 2.0 Flash</li>
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-primary rounded-full"></span>Pydantic V2</li>
+                    </ul>
+                </div>
+
+                <!-- Body -->
+                <div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 card-hover">
+                    <div class="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">The Body</h3>
+                    <p class="text-gray-400 text-sm mb-4">Web automation and interaction</p>
+                    <ul class="space-y-2 text-sm">
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-accent rounded-full"></span>Playwright</li>
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-accent rounded-full"></span>Playwright-Stealth</li>
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-accent rounded-full"></span>BeautifulSoup4</li>
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-accent rounded-full"></span>Google GenAI (Voice)</li>
+                    </ul>
+                </div>
+
+                <!-- Interface -->
+                <div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 card-hover">
+                    <div class="w-12 h-12 bg-yellow-500/20 rounded-xl flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    </div>
+                    <h3 class="text-xl font-semibold mb-3">The Interface</h3>
+                    <p class="text-gray-400 text-sm mb-4">Desktop dashboard app</p>
+                    <ul class="space-y-2 text-sm">
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>React 19</li>
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>Vite</li>
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>Tauri v2 (Rust)</li>
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>Bridge Server</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Architecture Flow -->
+    <section class="py-20 border-t border-dark-700">
+        <div class="max-w-6xl mx-auto px-6">
+            <h2 class="text-3xl font-bold text-center mb-4">System Architecture</h2>
+            <p class="text-gray-400 text-center mb-12 max-w-2xl mx-auto">How the agent components communicate and process user commands.</p>
+
+            <div class="relative">
+                <!-- Flow Diagram -->
+                <div class="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
+                    <!-- User -->
+                    <div class="bg-dark-800 border border-dark-700 rounded-xl p-4 text-center min-w-[140px] animate-float">
+                        <div class="text-3xl mb-2">👤</div>
+                        <div class="font-semibold">User</div>
+                        <div class="text-xs text-gray-500">Voice / Text</div>
+                    </div>
+
+                    <svg class="w-8 h-8 text-gray-600 rotate-90 md:rotate-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+
+                    <!-- Dashboard -->
+                    <div class="bg-dark-800 border border-yellow-500/30 rounded-xl p-4 text-center min-w-[140px]">
+                        <div class="text-3xl mb-2">🖥️</div>
+                        <div class="font-semibold">Dashboard</div>
+                        <div class="text-xs text-gray-500">React + Tauri</div>
+                    </div>
+
+                    <svg class="w-8 h-8 text-gray-600 rotate-90 md:rotate-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+
+                    <!-- Controller -->
+                    <div class="bg-dark-800 border border-primary/30 rounded-xl p-4 text-center min-w-[140px]">
+                        <div class="text-3xl mb-2">🧠</div>
+                        <div class="font-semibold">Controller</div>
+                        <div class="text-xs text-gray-500">LLM + Tools</div>
+                    </div>
+
+                    <svg class="w-8 h-8 text-gray-600 rotate-90 md:rotate-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+
+                    <!-- Browser -->
+                    <div class="bg-dark-800 border border-accent/30 rounded-xl p-4 text-center min-w-[140px]">
+                        <div class="text-3xl mb-2">🌐</div>
+                        <div class="font-semibold">Browser</div>
+                        <div class="text-xs text-gray-500">Playwright</div>
+                    </div>
+                </div>
+
+                <!-- Lowballer Branch -->
+                <div class="flex justify-center mt-8">
+                    <div class="flex flex-col items-center">
+                        <div class="w-0.5 h-8 bg-gradient-to-b from-primary to-accent"></div>
+                        <div class="bg-gradient-to-r from-primary to-accent p-[1px] rounded-xl">
+                            <div class="bg-dark-800 rounded-xl p-4 text-center min-w-[180px]">
+                                <div class="text-3xl mb-2">💰</div>
+                                <div class="font-semibold">Lowballer Agent</div>
+                                <div class="text-xs text-gray-500">Ackerman Model</div>
+                                <div class="mt-2 text-xs text-primary">65% → 85% → 95% → 100%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Negotiation Strategy -->
+    <section class="py-20 border-t border-dark-700">
+        <div class="max-w-6xl mx-auto px-6">
+            <h2 class="text-3xl font-bold text-center mb-4">Ackerman Negotiation Model</h2>
+            <p class="text-gray-400 text-center mb-12 max-w-2xl mx-auto">
+                Based on FBI hostage negotiation tactics from 
+                <span class="text-white">"Never Split the Difference"</span> by Chris Voss.
+            </p>
+
+            <div class="grid md:grid-cols-4 gap-4">
+                <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 text-center card-hover">
+                    <div class="text-4xl font-bold text-primary mb-2">65%</div>
+                    <div class="font-semibold mb-2">Round 1</div>
+                    <p class="text-sm text-gray-400">Anchor low with tactical empathy. Use precise numbers like $387.</p>
+                </div>
+                <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 text-center card-hover">
+                    <div class="text-4xl font-bold text-accent mb-2">85%</div>
+                    <div class="font-semibold mb-2">Round 2</div>
+                    <p class="text-sm text-gray-400">Mirror their response. Add value: "Cash pickup in 1 hour".</p>
+                </div>
+                <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 text-center card-hover">
+                    <div class="text-4xl font-bold text-yellow-500 mb-2">95%</div>
+                    <div class="font-semibold mb-2">Round 3</div>
+                    <p class="text-sm text-gray-400">Label their situation. Create urgency. Show flexibility.</p>
+                </div>
+                <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 text-center card-hover">
+                    <div class="text-4xl font-bold text-red-500 mb-2">100%</div>
+                    <div class="font-semibold mb-2">Round 4</div>
+                    <p class="text-sm text-gray-400">Walk-away bluff. "Totally understand if it doesn't work!"</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section class="py-20 border-t border-dark-700">
+        <div class="max-w-6xl mx-auto px-6">
+            <h2 class="text-3xl font-bold text-center mb-12">Key Features</h2>
+            
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="flex items-start gap-4">
+                    <div class="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span class="text-xl">🕵️</span>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold mb-1">Stealth Browsing</h3>
+                        <p class="text-sm text-gray-400">Bypasses bot detection with playwright-stealth for seamless automation.</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-4">
+                    <div class="w-10 h-10 bg-accent/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span class="text-xl">🎙️</span>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold mb-1">Voice Commands</h3>
+                        <p class="text-sm text-gray-400">Record voice messages, transcribe with Gemini, and send to sellers.</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-4">
+                    <div class="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span class="text-xl">🎭</span>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold mb-1">Persona-Based Chat</h3>
+                        <p class="text-sm text-gray-400">Choose between "Student", "Urgent Cash", or "Chris Voss" styles.</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-4">
+                    <div class="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span class="text-xl">📊</span>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold mb-1">Live Dashboard</h3>
+                        <p class="text-sm text-gray-400">Monitor all negotiations in real-time with the Tauri desktop app.</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-4">
+                    <div class="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span class="text-xl">🔄</span>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold mb-1">Auto-Sync Chat</h3>
+                        <p class="text-sm text-gray-400">Scrapes and syncs conversation history for context-aware replies.</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-4">
+                    <div class="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span class="text-xl">🤖</span>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold mb-1">Multi-LLM Support</h3>
+                        <p class="text-sm text-gray-400">Switch between Gemini, Ollama (local), or GPT-4 via LiteLLM.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-dark-700 py-12">
+        <div class="max-w-6xl mx-auto px-6 text-center">
+            <p class="text-gray-500 mb-4">Built with ❤️ for hackathon</p>
+            <div class="flex justify-center gap-6">
+                <a href="https://github.com/WolfverusWasTaken/cheapskate.ai" target="_blank" class="text-gray-400 hover:text-white transition-colors">GitHub</a>
+                <a href="https://devpost.com/software/cheapskate-ai" target="_blank" class="text-gray-400 hover:text-white transition-colors">Devpost</a>
+            </div>
+            <p class="text-xs text-gray-600 mt-6">MIT License. Use responsibly.</p>
+        </div>
+    </footer>
+</body>
+</html>
