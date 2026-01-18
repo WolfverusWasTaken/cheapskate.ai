@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import ItemCard from './components/ItemCard'
+import ProductRow from './components/ProductRow/ProductRow'
 import { mockData } from './data/mockData'
+import { fetchLiveData, mergeLiveWithMock } from './utils/liveDataLoader'
 import './App.css'
 
 function LiveStream() {
@@ -187,6 +188,24 @@ function ChatPanel() {
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
+  const [liveData, setLiveData] = useState(null)
+
+  // Poll for live negotiation data
+  useEffect(() => {
+    const loadLiveData = async () => {
+      const data = await fetchLiveData()
+      if (data) {
+        setLiveData(data)
+      }
+    }
+
+    loadLiveData()
+    const interval = setInterval(loadLiveData, 2000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Merge live data with mock data - live data appears first
+  const allData = mergeLiveWithMock(liveData, mockData)
 
   return (
     <div className="app">
@@ -220,8 +239,8 @@ function App() {
 
         <div className={`tab-content ${activeTab === 'dashboard' ? 'active' : 'hidden'}`}>
           <div className="item-list">
-            {Object.entries(mockData).map(([itemName, data]) => (
-              <ItemCard key={itemName} itemName={itemName} data={data} />
+            {Object.entries(allData).map(([productName, data]) => (
+              <ProductRow key={productName} productName={productName} data={data} />
             ))}
           </div>
         </div>
