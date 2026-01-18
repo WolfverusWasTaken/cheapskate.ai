@@ -14,7 +14,7 @@ from config import config
 
 try:
     import litellm
-    from litellm import completion
+    from litellm import completion, acompletion
     LITELLM_AVAILABLE = True
 except ImportError:
     LITELLM_AVAILABLE = False
@@ -55,6 +55,7 @@ class LLMClient:
                 os.environ["OLLAMA_API_BASE"] = api_base
             if api_key:
                 os.environ["GEMINI_API_KEY"] = api_key
+                os.environ["GOOGLE_API_KEY"] = api_key # Some versions expect this
         
         print(f"LLM_FACTORY: Initialized with model={model}")
     
@@ -96,7 +97,8 @@ class LLMClient:
                 kwargs["tools"] = tools
                 kwargs["tool_choice"] = "auto"
             
-            response = completion(**kwargs)
+            # Use acompletion for async to avoid blocking the main loop
+            response = await acompletion(**kwargs)
             
             # Parse response
             message = response.choices[0].message
@@ -233,7 +235,7 @@ Write a natural negotiation message."""
             return random.choice(fallbacks)
         
         try:
-            response = completion(
+            response = await acompletion(
                 model=self.model,
                 messages=messages,
                 temperature=0.8,
@@ -265,7 +267,7 @@ class LLMFactory:
             )
         elif provider == "gemini":
             return LLMClient(
-                model="gemini/gemini-pro",
+                model="gemini/gemini-1.5-flash-latest",
                 api_key=config.llm.gemini_api_key,
             )
         else:
@@ -281,9 +283,9 @@ class LLMFactory:
         return LLMClient(model=f"ollama/{model}", api_base=url)
     
     @staticmethod
-    def create_gemini(api_key: str) -> LLMClient:
+    def create_gemini(api_key: str, model: str = "gemini-1.5-flash-latest") -> LLMClient:
         """Create a Gemini client with explicit API key."""
-        return LLMClient(model="gemini/gemini-pro", api_key=api_key)
+        return LLMClient(model=f"gemini/{model}", api_key=api_key)
 
 
 # Standalone test

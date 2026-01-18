@@ -59,7 +59,7 @@ class Config:
         if self.llm.provider == "ollama":
             return f"ollama/{self.llm.ollama_model}"
         elif self.llm.provider == "gemini":
-            return "gemini/gemini-pro"
+            return "gemini/gemini-1.5-flash-latest"
         return "ollama/phi3:mini"
 
 
