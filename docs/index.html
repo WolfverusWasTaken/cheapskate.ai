@@ -179,6 +179,282 @@
             background: #3a3a3a;
             border-radius: 4px;
         }
+
+        /* 3D Cube Animation */
+        .cube-container-hero {
+            width: 250px;
+            height: 250px;
+            perspective: 1000px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .cube-hero {
+            width: 140px;
+            height: 140px;
+            position: relative;
+            transform-style: preserve-3d;
+            animation: rotateCubeHero 8s infinite linear;
+        }
+
+        .cube-face-hero {
+            position: absolute;
+            width: 140px;
+            height: 140px;
+            border: 2px solid #60a5fa;
+            background: rgba(23, 23, 23, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 15px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #60a5fa;
+            text-transform: uppercase;
+            box-shadow: inset 0 0 20px rgba(96, 165, 250, 0.3);
+            backface-visibility: visible;
+        }
+
+        .face-front {
+            transform: rotateY(0deg) translateZ(70px);
+        }
+
+        .face-back {
+            transform: rotateY(180deg) translateZ(70px);
+        }
+
+        .face-right {
+            transform: rotateY(90deg) translateZ(70px);
+        }
+
+        .face-left {
+            transform: rotateY(-90deg) translateZ(70px);
+        }
+
+        .face-top {
+            transform: rotateX(90deg) translateZ(70px);
+        }
+
+        .face-bottom {
+            transform: rotateX(-90deg) translateZ(70px);
+        }
+
+        @keyframes rotateCubeHero {
+            from {
+                transform: rotateX(0deg) rotateY(0deg);
+            }
+
+            to {
+                transform: rotateX(360deg) rotateY(360deg);
+            }
+        }
+
+        /* Terminal UI */
+        .terminal-window {
+            background: #000;
+            border-radius: 6px;
+            border: 1px solid #3a3a3a;
+            font-family: 'Consolas', 'Monaco', monospace;
+            overflow: hidden;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto 2.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 768px) {
+            .node-box {
+                min-width: 140px;
+                padding: 12px;
+                font-size: 14px;
+            }
+
+            .flow-line {
+                width: 2px !important;
+                height: 40px !important;
+                margin: 0 auto !important;
+            }
+
+            .flow-line::after {
+                animation: flowDotDown 2s ease-in-out infinite !important;
+                left: -3px !important;
+            }
+
+            .arch-flex {
+                flex-direction: column !important;
+                align-items: center !important;
+                min-width: 0 !important;
+            }
+
+            h1 {
+                font-size: 2.5rem !important;
+            }
+
+            section {
+                padding-top: 3rem !important;
+                padding-bottom: 3rem !important;
+            }
+        }
+
+        /* Ensure images don't overflow */
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* Support horizontal scroll for architecture on mobile */
+        .scroll-container {
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Scroll Reveal Animation */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Image Enlargement & Modal */
+        .image-container {
+            position: relative;
+            cursor: pointer;
+            overflow: hidden;
+        }
+
+        .image-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .image-container:hover .image-overlay {
+            opacity: 1;
+        }
+
+        /* Terminal UI */
+        .terminal-window {
+            background: #000;
+            border-radius: 6px;
+            border: 1px solid #3a3a3a;
+            font-family: 'Consolas', 'Monaco', monospace;
+            overflow: hidden;
+            width: 100%;
+            max-width: 320px;
+            margin: 0 auto 2.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .terminal-header {
+            background: #1f1f1f;
+            padding: 8px 12px;
+            display: flex;
+            gap: 6px;
+            border-bottom: 1px solid #3a3a3a;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .dot-red {
+            background: #ff5f56;
+        }
+
+        .dot-yellow {
+            background: #ffbd2e;
+        }
+
+        .dot-green {
+            background: #27c93f;
+        }
+
+        .terminal-body {
+            padding: 16px;
+            position: relative;
+            height: 160px;
+        }
+
+        .command-item {
+            padding: 6px 8px;
+            color: #666;
+            font-size: 13px;
+            transition: color 0.3s ease;
+            display: flex;
+            align-items: center;
+        }
+
+        .command-item.active {
+            color: #fff;
+        }
+
+        .terminal-selection {
+            position: absolute;
+            left: 12px;
+            right: 12px;
+            height: 30px;
+            background: rgba(255, 255, 255, 0.08);
+            border-left: 2px solid #fff;
+            z-index: 0;
+            transition: top 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .prompt {
+            color: #60a5fa;
+            margin-right: 8px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            max-width: 95%;
+            max-height: 95%;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            cursor: pointer;
+            padding: 10px;
+        }
     </style>
 </head>
 
@@ -195,28 +471,45 @@
     <!-- Hero -->
     <section class="bg-dark-800 border-b border-dark-600">
         <div class="max-w-7xl mx-auto px-6 py-20">
-            <h1 class="text-5xl font-semibold text-white mb-6">Cheapskate.ai Documentation</h1>
-            <p class="text-xl text-gray-400 max-w-3xl mb-10 leading-relaxed">
-                An autonomous AI agent that finds deals and negotiates prices on Carousell Singapore using FBI
-                negotiation tactics.
-            </p>
-            <div class="flex flex-wrap gap-6">
-                <a href="https://github.com/WolfverusWasTaken/cheapskate.ai" target="_blank"
-                    class="flex items-center gap-2 px-6 py-3 bg-dark-700 border border-dark-500 rounded-lg text-white hover:bg-dark-600 transition-all font-medium">
-                    <i data-lucide="github" class="w-5 h-5"></i>
-                    View on GitHub
-                </a>
-                <a href="https://devpost.com/software/cheapskate-ai" target="_blank"
-                    class="flex items-center gap-2 px-6 py-3 bg-dark-700 border border-dark-500 rounded-lg text-white hover:bg-dark-600 transition-all font-medium">
-                    <i data-lucide="external-link" class="w-5 h-5"></i>
-                    View on Devpost
-                </a>
+            <div class="flex flex-col md:flex-row items-center justify-between gap-12">
+                <div class="flex-1 text-center md:text-left">
+                    <h1 class="text-5xl font-semibold text-white mb-6">Cheapskate.ai Documentation</h1>
+                    <p class="text-xl text-gray-400 max-w-2xl mb-10 leading-relaxed mx-auto md:mx-0">
+                        An autonomous AI agent that finds deals and negotiates prices on Carousell Singapore using FBI
+                        negotiation tactics.
+                    </p>
+                    <div class="flex flex-wrap gap-6 justify-center md:justify-start">
+                        <a href="https://github.com/WolfverusWasTaken/cheapskate.ai" target="_blank"
+                            class="flex items-center gap-2 px-6 py-3 bg-dark-700 border border-dark-500 rounded-lg text-white hover:bg-dark-600 transition-all font-medium">
+                            <i data-lucide="github" class="w-5 h-5"></i>
+                            View on GitHub
+                        </a>
+                        <a href="https://devpost.com/software/cheapskate-ai" target="_blank"
+                            class="flex items-center gap-2 px-6 py-3 bg-dark-700 border border-dark-500 rounded-lg text-white hover:bg-dark-600 transition-all font-medium">
+                            <i data-lucide="external-link" class="w-5 h-5"></i>
+                            View on Devpost
+                        </a>
+                    </div>
+                </div>
+                <!-- 3D Floating Cube Decoration -->
+                <div class="hidden md:flex flex-1 justify-end">
+                    <div class="cube-container-hero">
+                        <div class="cube-hero">
+                            <div class="cube-face-hero face-front">Negotiate</div>
+                            <div class="cube-face-hero face-back">Find Deals</div>
+                            <div class="cube-face-hero face-right">Lowball</div>
+                            <div class="cube-face-hero face-left">Chris Voss</div>
+                            <div class="cube-face-hero face-top">Ackerman</div>
+                            <div class="cube-face-hero face-bottom">Automate</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
 
     <!-- Negotiation Model -->
-    <section class="max-w-7xl mx-auto px-6 py-16 border-t border-dark-600">
+    <section class="max-w-7xl mx-auto px-6 py-16 border-t border-dark-600 reveal">
         <h2 class="text-3xl font-semibold text-white mb-10 text-center">Ackerman Negotiation Model</h2>
 
         <div class="grid md:grid-cols-4 gap-4">
@@ -248,7 +541,7 @@
     </section>
 
     <!-- Key Features -->
-    <section class="max-w-7xl mx-auto px-6 py-16 border-t border-dark-600">
+    <section class="max-w-7xl mx-auto px-6 py-16 border-t border-dark-600 reveal">
         <h2 class="text-3xl font-semibold text-white mb-10">Key features</h2>
         <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div class="feature-card">
@@ -302,11 +595,104 @@
         </div>
     </section>
 
+    <!-- Dashboard Preview -->
+    <section class="max-w-7xl mx-auto px-6 py-16 border-t border-dark-600 reveal">
+        <h2 class="text-3xl font-semibold text-white mb-10">Interface Preview</h2>
+        <div class="space-y-16">
+            <!-- Dashboard 1 -->
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <div class="bg-dark-800 rounded-xl p-2 border border-dark-600 shadow-2xl overflow-hidden image-container"
+                    onclick="openModal('../assets/Dashboard.png')">
+                    <img src="../assets/Dashboard.png" alt="Cheapskate.ai Dashboard" class="rounded-lg w-full">
+                    <div class="image-overlay">
+                        <div class="flex flex-col items-center text-white">
+                            <i data-lucide="maximize-2" class="w-8 h-8 mb-2"></i>
+                            <span class="text-xs font-semibold uppercase tracking-wider">Click to Enlarge</span>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <!-- Terminal Command List -->
+                    <div class="terminal-window">
+                        <div class="terminal-header">
+                            <div class="dot dot-red"></div>
+                            <div class="dot dot-yellow"></div>
+                            <div class="dot dot-green"></div>
+                        </div>
+                        <div class="terminal-body" id="terminal">
+                            <div class="terminal-selection" id="selection-bar" style="top: 16px;"></div>
+                            <div class="command-list relative z-10">
+                                <div class="command-item active"><span class="prompt">λ</span> find ________</div>
+                                <div class="command-item"><span class="prompt">λ</span> lowball listing 0</div>
+                                <div class="command-item"><span class="prompt">λ</span> take screenshot</div>
+                                <div class="command-item"><span class="prompt">λ</span> open chat</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-2xl font-semibold text-white mb-4">Command Center</h3>
+                    <p class="text-gray-400 leading-relaxed mb-6">
+                        The main dashboard provides a unified view of all active negotiations. Monitor multiple chats
+                        simultaneously, track agent status, and manage your inventory with a clean, dark-themed
+                        interface built for speed and clarity.
+                    </p>
+
+                    <div class="mt-8 flex items-start gap-4 p-5 bg-accent/5 border border-accent/20 rounded-lg">
+                        <i data-lucide="zap" class="w-6 h-6 text-accent shrink-0 mt-1"></i>
+                        <div>
+                            <span class="block text-white font-semibold mb-1">Headless Streaming</span>
+                            <p class="text-sm text-gray-400 leading-relaxed">
+                                The automated browser is seamlessly embedded into the Tauri application via headless
+                                streaming, providing a live visual feed without cluttering your desktop.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard 2 -->
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <div class="order-2 md:order-1">
+                    <h3 class="text-2xl font-semibold text-white mb-4">Tactical Analytics</h3>
+                    <p class="text-gray-400 leading-relaxed mb-6">
+                        Dive deep into individual listings to see the agent's logic in action. Review real-time logs of
+                        the Ackerman model's progress, analyze seller responses, and adjust negotiation strategies on
+                        the fly.
+                    </p>
+                    <ul class="space-y-3 text-sm text-gray-400">
+                        <li class="flex items-center gap-3">
+                            <i data-lucide="check-circle" class="w-4 h-4 text-accent"></i>
+                            Real-time negotiation logs
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <i data-lucide="check-circle" class="w-4 h-4 text-accent"></i>
+                            Ackerman pricing stage tracking
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <i data-lucide="check-circle" class="w-4 h-4 text-accent"></i>
+                            Direct manual override controls
+                        </li>
+                    </ul>
+                </div>
+                <div class="bg-dark-800 rounded-xl p-2 border border-dark-600 shadow-2xl overflow-hidden order-1 md:order-2 image-container"
+                    onclick="openModal('../assets/Dashboard2.png')">
+                    <img src="../assets/Dashboard2.png" alt="Cheapskate.ai Analytics" class="rounded-lg w-full">
+                    <div class="image-overlay">
+                        <div class="flex flex-col items-center text-white">
+                            <i data-lucide="maximize-2" class="w-8 h-8 mb-2"></i>
+                            <span class="text-xs font-semibold uppercase tracking-wider">Click to Enlarge</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Architecture -->
-    <section class="max-w-7xl mx-auto px-6 py-16 border-t border-dark-600">
+    <section class="max-w-7xl mx-auto px-6 py-16 border-t border-dark-600 reveal">
         <h2 class="text-3xl font-semibold text-white mb-10">Architecture Pipeline</h2>
-        <div class="bg-dark-800 rounded-xl p-12 border border-dark-600 scroll-container overflow-x-auto">
-            <div class="flex items-start justify-center min-w-max pb-8">
+        <div class="bg-dark-800 rounded-xl p-8 md:p-12 border border-dark-600 overflow-hidden">
+            <div class="flex flex-row items-start justify-center arch-flex pb-8">
                 <!-- User Node -->
                 <div class="flex flex-col items-center">
                     <div class="node-box">
@@ -316,7 +702,7 @@
                     </div>
                 </div>
 
-                <div class="flow-line mt-[34px]"></div>
+                <div class="flow-line mt-0 md:mt-[34px]"></div>
 
                 <!-- Dashboard Node -->
                 <div class="flex flex-col items-center">
@@ -327,7 +713,7 @@
                     </div>
                 </div>
 
-                <div class="flow-line mt-[34px]" style="animation-delay: 0.5s"></div>
+                <div class="flow-line mt-0 md:mt-[34px]" style="animation-delay: 0.5s"></div>
 
                 <!-- Controller + Negotiator Node -->
                 <div class="flex flex-col items-center">
@@ -358,7 +744,7 @@
                     </div>
                 </div>
 
-                <div class="flow-line mt-[34px]" style="animation-delay: 1s"></div>
+                <div class="flow-line mt-0 md:mt-[34px]" style="animation-delay: 1s"></div>
 
                 <!-- Browser Node -->
                 <div class="flex flex-col items-center">
@@ -373,7 +759,7 @@
     </section>
 
     <!-- Components -->
-    <section class="max-w-7xl mx-auto px-6 py-16 border-t border-dark-600">
+    <section class="max-w-7xl mx-auto px-6 py-16 border-t border-dark-600 reveal">
         <h2 class="text-3xl font-semibold text-white mb-10">System Components</h2>
         <div class="grid md:grid-cols-3 gap-8">
             <div class="border-t-4 border-accent pt-6">
@@ -480,9 +866,71 @@
         </div>
     </footer>
 
+    <!-- Modal Skeleton -->
+    <div id="imageModal" class="modal" onclick="closeModal()">
+        <span class="modal-close"><i data-lucide="x" class="w-8 h-8"></i></span>
+        <img id="modalImg" class="modal-content" src="" alt="Enlarged view">
+    </div>
+
     <script>
         // Initialize Lucide icons
         lucide.createIcons();
+
+        // Modal Logic
+        const modal = document.getElementById('imageModal');
+        const modalImg = document.getElementById('modalImg');
+
+        function openModal(src) {
+            modal.classList.add('active');
+            modalImg.src = src;
+            document.body.style.overflow = 'hidden'; // Prevent scroll
+        }
+
+        function closeModal() {
+            modal.classList.remove('active');
+            document.body.style.overflow = 'auto'; // Re-enable scroll
+        }
+
+        // Terminal Animation
+        const items = document.querySelectorAll('.command-item');
+        const selectionBar = document.getElementById('selection-bar');
+        let currentIndex = 0;
+
+        function updateTerminal() {
+            if (!items.length || !selectionBar) return;
+
+            items.forEach((item, index) => {
+                if (index === currentIndex) {
+                    item.classList.add('active');
+                    // Calculate position: paddingTop (16) + index * itemHeight (approx 31px)
+                    selectionBar.style.top = (16 + index * 31) + 'px';
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+            currentIndex = (currentIndex + 1) % items.length;
+        }
+
+        // Run animation if elements exist
+        if (items.length > 0) {
+            setInterval(updateTerminal, 1000);
+            updateTerminal(); // Run immediately
+        }
+
+        // Scroll Reveal Observer
+        const observerOptions = {
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('active');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
     </script>
 </body>
 
