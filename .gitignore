@@ -26,6 +26,8 @@ screenshots/
 chat_history.json
 *.png
 *.jpg
+!docs/assets/
+!docs/assets/**
 
 # OS
 .DS_Store
