@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cheapskate.ai Documentation</title>
+    <title>Cheapskate.ai | Showcase</title>
     <meta name="description"
         content="An autonomous AI agent that finds deals and negotiates prices on Carousell Singapore.">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -469,40 +469,42 @@
     </header>
 
     <!-- Hero -->
-    <section class="bg-dark-800 border-b border-dark-600">
-        <div class="max-w-7xl mx-auto px-6 py-20">
-            <div class="flex flex-col md:flex-row items-center justify-between gap-12">
-                <div class="flex-1 text-center md:text-left">
-                    <h1 class="text-5xl font-semibold text-white mb-6">Cheapskate.ai Documentation</h1>
-                    <p class="text-xl text-gray-400 max-w-2xl mb-10 leading-relaxed mx-auto md:mx-0">
-                        An autonomous AI agent that finds deals and negotiates prices on Carousell Singapore using FBI
-                        negotiation tactics.
-                    </p>
-                    <div class="flex flex-wrap gap-6 justify-center md:justify-start">
-                        <a href="https://github.com/WolfverusWasTaken/cheapskate.ai" target="_blank"
-                            class="flex items-center gap-2 px-6 py-3 bg-dark-700 border border-dark-500 rounded-lg text-white hover:bg-dark-600 transition-all font-medium">
-                            <i data-lucide="github" class="w-5 h-5"></i>
-                            View on GitHub
-                        </a>
-                        <a href="https://devpost.com/software/cheapskate-ai" target="_blank"
-                            class="flex items-center gap-2 px-6 py-3 bg-dark-700 border border-dark-500 rounded-lg text-white hover:bg-dark-600 transition-all font-medium">
-                            <i data-lucide="external-link" class="w-5 h-5"></i>
-                            View on Devpost
-                        </a>
-                    </div>
+    <section
+        class="bg-dark-800 border-b border-dark-600 relative overflow-hidden min-h-screen flex flex-col items-center justify-center">
+        <!-- Subtle Background Glow -->
+        <div
+            class="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_50%_-20%,rgba(96,165,250,0.15),transparent_70%)] pointer-events-none">
+        </div>
+
+        <div class="max-w-7xl mx-auto px-6 py-12 relative z-10 w-full">
+            <!-- Banner Image First -->
+            <div class="relative group mb-8">
+                <div
+                    class="rounded-2xl overflow-hidden border border-dark-500 shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-transform duration-500 group-hover:scale-[1.005]">
+                    <img src="assets/Banner.png" alt="Cheapskate.ai Banner" class="w-full h-auto">
                 </div>
-                <!-- 3D Floating Cube Decoration -->
-                <div class="hidden md:flex flex-1 justify-end">
-                    <div class="cube-container-hero">
-                        <div class="cube-hero">
-                            <div class="cube-face-hero face-front">Negotiate</div>
-                            <div class="cube-face-hero face-back">Find Deals</div>
-                            <div class="cube-face-hero face-right">Lowball</div>
-                            <div class="cube-face-hero face-left">Chris Voss</div>
-                            <div class="cube-face-hero face-top">Ackerman</div>
-                            <div class="cube-face-hero face-bottom">Automate</div>
-                        </div>
-                    </div>
+            </div>
+
+            <!-- Content Under Image -->
+            <div class="text-center">
+                <h1 class="text-5xl md:text-6xl font-bold text-white mb-6 tracking-tight">Documentation</h1>
+                <p class="text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed mb-10">
+                    An autonomous AI agent that finds deals and negotiates prices on Carousell Singapore using FBI
+                    negotiation tactics.
+                </p>
+
+                <!-- Floating Badge/Quick Links -->
+                <div class="flex flex-wrap gap-4 justify-center">
+                    <a href="https://github.com/WolfverusWasTaken/cheapskate.ai" target="_blank"
+                        class="flex items-center gap-2 px-8 py-3 bg-white text-dark-900 rounded-full hover:bg-gray-200 transition-all font-bold shadow-lg shadow-white/5">
+                        <i data-lucide="github" class="w-5 h-5"></i>
+                        Get Started on GitHub
+                    </a>
+                    <a href="https://devpost.com/software/cheapskate-ai" target="_blank"
+                        class="flex items-center gap-2 px-8 py-3 bg-dark-700 border border-dark-500 rounded-full text-white hover:bg-dark-600 transition-all font-semibold">
+                        <i data-lucide="external-link" class="w-5 h-5"></i>
+                        Devpost
+                    </a>
                 </div>
             </div>
         </div>
@@ -510,6 +512,20 @@
 
     <!-- Negotiation Model -->
     <section class="max-w-7xl mx-auto px-6 py-16 border-t border-dark-600 reveal">
+        <!-- 3D Floating Cube Decoration -->
+        <div class="flex justify-center mb-12">
+            <div class="cube-container-hero">
+                <div class="cube-hero">
+                    <div class="cube-face-hero face-front">Negotiate</div>
+                    <div class="cube-face-hero face-back">Find Deals</div>
+                    <div class="cube-face-hero face-right">Lowball</div>
+                    <div class="cube-face-hero face-left">Chris Voss</div>
+                    <div class="cube-face-hero face-top">Ackerman</div>
+                    <div class="cube-face-hero face-bottom">Automate</div>
+                </div>
+            </div>
+        </div>
+
         <h2 class="text-3xl font-semibold text-white mb-10 text-center">Ackerman Negotiation Model</h2>
 
         <div class="grid md:grid-cols-4 gap-4">

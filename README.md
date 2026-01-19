@@ -1,3 +1,5 @@
+![Cheapskate.ai Banner](docs/assets/Banner.png)
+
 # 💰 Cheapskate.ai
 
 ### *The Ultimate AI-Powered Carousell Lowballer*
